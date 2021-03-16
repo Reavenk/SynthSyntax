@@ -1,0 +1,79 @@
+struct vec3f
+{
+	float x;
+	float y;
+	float z;
+	
+	vec3f(){}
+	
+	vec3f(float x, float y, float z)
+	{
+		this.x = x;
+		this.y = y;
+		this.z = z;
+	}
+	
+	vec3f operator + (vec3f & v3)
+	{
+		return vec3f(this.x + v3.x, this.y + v3.y, this.z + v3.z);
+	}
+	
+	vec3f operator - (vec3f & v3)
+	{
+		return vec3f(this.x - v3.x, this.y - v3.y, this.z - v3.z);
+	}
+	
+	vec3f operator * (float f)
+	{
+		return vec3f(this.x * f, this.y * f, this.z * f);
+	}
+	
+	vec3f operator / (float f)
+	{
+		return vec3f(this.x / f, this.y / f, this.z / f);
+	}
+	
+	void operator += (vec3f v3)
+	{
+		this.x += v3.x;
+		this.y += v3.y;
+		this.z += v3.z;
+	}
+	
+	void operator -= (vec3f v3)
+	{
+		this.x -= v3.x;
+		this.y -= v3.y;
+		this.z -= v3.z;
+	}
+	
+	void operator *= (float f)
+	{
+		this.x *= f;
+		this.y *= f;
+		this.z *= f;
+	}
+	
+	void operator /= (float f)
+	{
+		this.x /= f;
+		this.y /= f;
+		this.z /= f;
+	}
+	
+	bool operator == (vec3f & v3)
+	{
+		return 
+			v3.x == this.x &&
+			v3.y == this.y &&
+			v3.z == this.z;
+	}
+	
+	bool operator != (vec3f& v3)
+	{
+		return 
+			v3.x != this.x ||
+			v3.y != this.y ||
+			v3.z != this.z;
+	}
+}

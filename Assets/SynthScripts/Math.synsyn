@@ -1,0 +1,8 @@
+extern float Sin(float rad);
+extern float Arcsin(float x);
+
+extern float Cos(float rad);
+extern float Arccos(float x);
+
+extern float Tan(float rad);
+extern float Arctan(float x);

@@ -1,0 +1,15 @@
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	LogTest(0);
+	
+	int i = 0;
+	LogTest(i);
+	LogTest(i++);
+	LogTest( 10 + 5);
+	LogTest( 20 * 40 + 500 / 25);
+	EndTest();
+	
+}

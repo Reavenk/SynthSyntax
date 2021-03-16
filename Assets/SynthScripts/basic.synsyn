@@ -1,0 +1,39 @@
+param vec3f boxDim = vec3f(0.0f, 0.0f, 0.0f);
+param float toothSz = 0.5f;
+param float plyWidth = 0.3f;
+
+struct CareFree
+{
+	int c = 5;
+	float d = 6.0f;
+	
+	void DoThatThing()
+	{
+		this.c = (int)d;
+	}
+}
+
+entry Generate2D(Ctx2d ctx)
+{
+	//ctx.Rectangle
+	ctx.Object("LeftSide")
+	{
+		for(int i = 0; i < 10; ++i)
+			ctx.Rectangle(10.0f, 10.0f, 1.0f, 10.0f);
+	};
+	
+	ctx.Object("RightSide")
+	{
+	};
+}
+
+//
+// Generate the 3D mesh.
+//
+//////////////////////////////////////////////////
+entry Generate3d(Ctx3d ctx)
+{
+	ctx.SetColor(0.0f, 1.0f, 0.0f);		/* Set the color of the contex. */
+	ctx.Extrusion("LeftSide", 	3.0f);
+	ctx.Extrusion("RightSide", 	3.0f);
+}

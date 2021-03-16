@@ -1,0 +1,7 @@
+struct rectf
+{
+	float top;
+	float left;
+	float width;
+	float height;
+}
