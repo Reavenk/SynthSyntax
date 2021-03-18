@@ -1,0 +1,3 @@
+[submodule "Assets/Scripts/Refs/PrecisionWASM_Core"]
+	path = Assets/Scripts/Refs/PrecisionWASM_Core
+	url = https://github.com/Reavenk/PrecisionWASM_Core.git
