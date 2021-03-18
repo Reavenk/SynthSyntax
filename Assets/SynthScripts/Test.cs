@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using PxPre.SynthSyn;
 
-public class SynSynTest : MonoBehaviour
+public class Test : MonoBehaviour
 {
     // Start is called before the first frame update
     void Start()
@@ -21,7 +21,8 @@ public class SynSynTest : MonoBehaviour
             synCtx.ParseFile("Assets/SynthScripts/Vali_Simple.synsyn");
             //synCtx.ParseFile("Assets/SynthScripts/Vali_Simple2.synsyn");
 
-            synCtx.BuildWASM();
+            byte [] rb = synCtx.BuildWASM();
+            System.IO.File.WriteAllBytes("TestBuild.wasm", rb);
         }
     }
 

@@ -467,7 +467,7 @@ namespace PxPre.SynthSyn
             return left;
         }
 
-        public void ProcessContextTokens(SynthFuncDecl function, List<TokenTree> trees)
+        public void ProcessContextTokens(WASMBuild build, SynthFuncDecl function, List<TokenTree> trees)
         { 
         }
 

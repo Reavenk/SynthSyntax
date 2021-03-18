@@ -260,13 +260,259 @@ namespace PxPre.SynthSyn
 
         public byte [] BuildWASM()
         {
+            SythContextBuilder builder = new SythContextBuilder();
 
-            // TODO: String container
-            // TODO: BUILD AST For all class
-            // TODO: Build 
+            WASMBuild build = new WASMBuild();
+
+            // Gather all the functions in the entire build, and make a collection
+            // of their unique types.
+            this.GatherFunctionRegistration(build);
+            // Reorganize function indices so imported functions come first. This is
+            // required for WASM.
+            build.RealignFunctions();
+
+            List<byte> fileContent = new List<byte>();
+            fileContent.AddRange( System.BitConverter.GetBytes(WASM.BinParse.WASM_BINARY_MAGIC));
+            fileContent.AddRange( System.BitConverter.GetBytes(1));
+
+            // TODO: Consider removing the WASMSection class (in another file)
+
+            foreach (var kvp in this.functions)
+            {
+                List<SynthFuncDecl> lst = kvp.Value;
+                foreach(SynthFuncDecl sfd in lst)
+                { 
+                    sfd.Build(build, builder);
+                }
+            }
+
+            //
+            //      FUNCTION TYPE DECLARATIONS
+            //      "Type"s
+            //////////////////////////////////////////////////
+            fileContent.Add( (byte)WASM.Bin.Section.TypeSec );
+            { 
+                List<byte> typeSection = new List<byte>();
+            
+                // Function type count
+                typeSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)build.functionTypes.Count));
+
+                for(int i = 0; i < build.functionTypes.Count; ++i)
+                { 
+                    WASMBuild.FunctionType fty = build.functionTypes[i];
+
+                    // Function tag
+                    typeSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)WASM.Bin.TypeID.Function));
+
+                    // Param count
+                    typeSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)fty.paramTys.Count));
+                    // Param values
+                    for(int j = 0; j < fty.paramTys.Count; ++j)
+                    {
+                        // Types will never be big enough to need LEB encoding. Single byte is fine.
+                        typeSection.Add((byte)fty.paramTys[j]);
+                    }
+            
+                    // Only 1 return value max will ever be returned.
+                    if(fty.retTy == WASM.Bin.TypeID.Empty)
+                        typeSection.Add(0);
+                    else
+                    {
+                        typeSection.Add(1);
+                        typeSection.Add((byte)fty.retTy);
+                    }
+                }
+            
+                fileContent.AddRange(WASM.BinParse.EncodeSignedLEB(typeSection.Count));
+                fileContent.AddRange(typeSection);
+            }
+
+            //
+            //      IMPORTED FUNCTION DECLARATIONS
+            //      "Import"s
+            //////////////////////////////////////////////////
+            fileContent.Add( (byte)WASM.Bin.Section.ImportSec );
+            { 
+                List<byte> importSection = new List<byte>();
+            
+                List<WASMBuild.FunctionInfo> lstImported = build.GetRangeImportFunctions();
+
+                // Function count
+                importSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)lstImported.Count));
+            
+                for(int i = 0; i < lstImported.Count; ++i)
+                {
+                    string env = "ImportedFns";
+                    string field = lstImported[i].function.functionName;
+
+                    importSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)env.Length));
+                    importSection.AddRange(System.Text.Encoding.ASCII.GetBytes(env));
+                    //
+                    importSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)field.Length));
+                    importSection.AddRange(System.Text.Encoding.ASCII.GetBytes(field));
+
+                    importSection.Add(0); // Import kind
+
+                    importSection.AddRange(WASM.BinParse.EncodeSignedLEB((uint)lstImported[i].typeIndex));
+                }
+            
+                fileContent.AddRange(WASM.BinParse.EncodeSignedLEB(importSection.Count));
+                fileContent.AddRange(importSection);
+            }
+
+            //
+            //      LOCAL FUNCTION DECLARACTIONS
+            //      "Function"s
+            //////////////////////////////////////////////////
+            List<WASMBuild.FunctionInfo> lstLocalFns = build.GetRangeNonImportFunctions();
+            fileContent.Add( (byte)PxPre.WASM.Bin.Section.FunctionSec );
+            {
+                List<byte> functionSection = new List<byte>();
+
+                // Function Count
+                functionSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)lstLocalFns.Count));
+            
+                for(int i = 0; i < lstLocalFns.Count; ++i)
+                    functionSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)lstLocalFns[i].typeIndex));
+            
+                fileContent.AddRange(WASM.BinParse.EncodeSignedLEB(functionSection.Count));
+                fileContent.AddRange(functionSection);
+            }
+
+            //
+            //      TABLE DECLARACTIONS
+            //      "Table"s
+            //////////////////////////////////////////////////
+            fileContent.Add((byte)WASM.Bin.Section.TableSec);
+            {
+                List<byte> tableSections = new List<byte>();
+            
+                tableSections.AddRange(WASM.BinParse.EncodeUnsignedLEB(0));
+            
+                fileContent.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)tableSections.Count));
+                fileContent.AddRange(tableSections);
+            }
+
+            //
+            //      MEMORY DECLARACTIONS
+            //      "Memory"s
+            //////////////////////////////////////////////////
+            fileContent.Add((byte)WASM.Bin.Section.MemorySec);
+            { 
+                List<byte> memorySection = new List<byte>();
+            
+                memorySection.AddRange(WASM.BinParse.EncodeUnsignedLEB(0));
+            
+                fileContent.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)memorySection.Count));
+                fileContent.AddRange(memorySection);
+            }
+
+            //
+            //      --
+            //      "Globals"s
+            //////////////////////////////////////////////////
+            fileContent.Add((byte)WASM.Bin.Section.GlobalSec);
+            { 
+                List<byte> globalsSection = new List<byte>();
+            
+                globalsSection.AddRange(WASM.BinParse.EncodeUnsignedLEB(0));
+
+                fileContent.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)globalsSection.Count));
+                fileContent.AddRange(globalsSection);
+            }
+
+            //      --
+            //      "Export"s
+            //////////////////////////////////////////////////
+            fileContent.Add((byte)WASM.Bin.Section.ExportSec);
+            {
+                List<byte> exportSection = new List<byte>();
+
+                exportSection.AddRange(WASM.BinParse.EncodeUnsignedLEB(0));
+
+                fileContent.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)exportSection.Count));
+                fileContent.AddRange(exportSection);
+            }
+
+            
+
+            //
+            //      --
+            //      "Start"
+            //////////////////////////////////////////////////
+            fileContent.Add((byte)WASM.Bin.Section.StartSec);
+            {
+                List<byte> startSection = new List<byte>();
+
+                int startFnID = 0;
+                startSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)startFnID));
 
 
-            return null;
+                fileContent.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)startSection.Count));
+                fileContent.AddRange(startSection);
+            }
+
+            //
+            //      --
+            //      "Elems"
+            //////////////////////////////////////////////////
+            fileContent.Add((byte)WASM.Bin.Section.ElementSec);
+            {
+                List<byte> elemsSection = new List<byte>();
+
+                elemsSection.AddRange(WASM.BinParse.EncodeUnsignedLEB(0));
+
+                fileContent.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)elemsSection.Count));
+                fileContent.AddRange(elemsSection);
+            }
+
+            //
+            //      --
+            //      "Code"
+            //////////////////////////////////////////////////
+            fileContent.Add((byte)WASM.Bin.Section.CodeSec);
+            {
+                List<byte> codeSection = new List<byte>();
+
+                // Num functions
+                codeSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)lstLocalFns.Count));
+
+                for (int i = 0; i < lstLocalFns.Count; ++i)
+                {
+                    WASMBuild.FunctionInfo finfo = lstLocalFns[i];
+
+                    List<byte> functionBody = new List<byte>();
+
+                    functionBody.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)finfo.localTypes.Count)); // Local decl
+                    // TODO: Local types
+                    functionBody.Add((byte)WASM.Instruction.end);
+
+                    // Function size
+                    codeSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)functionBody.Count));
+                    // Locals byte size
+                    codeSection.AddRange(functionBody);
+                }
+
+                fileContent.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)codeSection.Count));
+                fileContent.AddRange(codeSection);
+            }
+
+            //
+            //      --
+            //      "Data"
+            //////////////////////////////////////////////////
+            fileContent.Add((byte)WASM.Bin.Section.DataSec);
+            { 
+                List<byte> dataSection = new List<byte>();
+            
+                dataSection.AddRange(WASM.BinParse.EncodeUnsignedLEB(0));
+            
+                fileContent.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)dataSection.Count));
+                fileContent.AddRange(dataSection);
+            }
+
+            return fileContent.ToArray();
         }
+
     }
 }

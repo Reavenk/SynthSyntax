@@ -72,6 +72,8 @@ namespace PxPre.SynthSyn
 
         public bool isExtern = false;
 
+        public SythContextBuilder build = new SythContextBuilder();
+
         public SynthFuncDecl(SynthScope parentScope)
             : base(parentScope)
         { 
@@ -491,5 +493,30 @@ namespace PxPre.SynthSyn
         {
             return this;
         }
+
+        public SythContextBuilder Build(WASMBuild build, SythContextBuilder parentContext)
+        {
+            SythContextBuilder builder = new SythContextBuilder();
+
+            List<TokenTree> treeLines = new List<TokenTree>();
+            for(int i = 0; i < executingLines.Count; ++i)
+            { 
+                List<Token> execLine = executingLines[i];
+                TokenTree rootLineNode = TokenTree.EatTokensIntoTree(execLine);
+                treeLines.Add(rootLineNode);
+            }
+
+            builder.ProcessContextTokens(build, this, treeLines);
+
+            return builder;
+        }
+
+        public override void GatherFunctionRegistration(WASMBuild builds)
+        { 
+            builds.RegisterFunction(this);
+
+            base.GatherFunctionRegistration(builds);
+        }
+
     }
 }

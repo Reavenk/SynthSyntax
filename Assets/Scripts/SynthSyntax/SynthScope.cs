@@ -343,5 +343,20 @@ namespace PxPre.SynthSyn
 
             return null;
         }
+
+        public virtual void GatherFunctionRegistration(WASMBuild builds)
+        {
+            foreach(var v in this.functions)
+            {
+                foreach(var w in v.Value)
+                    w.GatherFunctionRegistration(builds);
+            }
+
+            foreach(var v in this.typesDefs)
+                v.Value.GatherFunctionRegistration(builds);
+
+            foreach(var v in this.regions)
+                v.Value.GatherFunctionRegistration(builds);
+        }
     }
 }
