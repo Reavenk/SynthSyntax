@@ -483,7 +483,7 @@ namespace PxPre.SynthSyn
 
                     List<byte> functionBody = new List<byte>();
 
-                    functionBody.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)finfo.localTypes.Count)); // Local decl
+                    functionBody.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)lstLocalFns[i].function.localTypes.Count)); // Local decl
                     // TODO: Local types
                     functionBody.Add((byte)WASM.Instruction.end);
 

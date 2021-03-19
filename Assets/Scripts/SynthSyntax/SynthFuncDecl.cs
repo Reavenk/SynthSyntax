@@ -70,9 +70,26 @@ namespace PxPre.SynthSyn
 
         public List<List<Token>> executingLines = new List<List<Token>>();
 
+        /// <summary>
+        /// True if the function is provided from external sources.
+        /// 
+        /// In WASM lingo, this means the function will be imported.
+        /// </summary>
         public bool isExtern = false;
 
         public SythContextBuilder build = new SythContextBuilder();
+
+        // TODO: Reorganize correctly (refactor)
+        // Cached WASM types on the stack. This should map 1-to-1 with the stack variable listing
+        public List<WASM.Bin.TypeID> localTypes = new List<WASM.Bin.TypeID>();
+
+        // TODO: Reorganize correctly (refactor)
+        // The AST for the function
+        public TokenAST ast;
+
+        // TODO: Reorganize correctly (refactor)
+        // The WASM bytecode for the function.
+        public byte [] fnBin = null;
 
         public SynthFuncDecl(SynthScope parentScope)
             : base(parentScope)
@@ -224,6 +241,8 @@ namespace PxPre.SynthSyn
                     case "<=":
                     case ">":
                     case ">=":
+                    case ">>=":
+                    case "<<=":
                         fnName += tokens[idx].fragment;
                         ++idx;
                         break;
@@ -325,7 +344,10 @@ namespace PxPre.SynthSyn
             List<Token> fnBodPhrase = null;
             
             if(isExtern == false)
-                this.declPhrase.GetRange(startFn + 1, endFn - startFn - 2);
+            {
+                // TODO: Log and debug stuff
+                fnBodPhrase = this.declPhrase.GetRange(startFn + 1, endFn - startFn - 2);
+            }
 
             //
             //      FORMALIZE DECLARACTIONS
@@ -363,6 +385,8 @@ namespace PxPre.SynthSyn
 
             if(fnBodPhrase != null)
             {
+                SynthLog.Log("Parsing function body.");
+
                 while (fnBodPhrase.Count > 0)
                 { 
                     if(Parser.EatLeadingSemicolons(fnBodPhrase) == true)
@@ -392,6 +416,9 @@ namespace PxPre.SynthSyn
 
                     List<Token> execPhrase = fnBodPhrase.GetRange(0, idx);
                     fnBodPhrase.RemoveRange(0, idx);
+
+                    SynthLog.Log("Extracted function phrase:");
+                    SynthLog.LogFragments( execPhrase );
 
                     this.executingLines.Add(execPhrase);
                 }
@@ -498,15 +525,34 @@ namespace PxPre.SynthSyn
         {
             SythContextBuilder builder = new SythContextBuilder();
 
-            List<TokenTree> treeLines = new List<TokenTree>();
+            if(this.ast != null)
+                throw new SynthExceptionImpossible($"Attempting to build function {this.functionName} AST multiple times.");
+
+            // NOTE: For now functions are non-typed (in the SynthSyn language) and 
+            // are non addressable.
+            this.ast = new TokenAST(this.declPhrase[0], TokenASTType.FunctionDecl, this, null, false);
+
+            //List<TokenTree> treeLines = new List<TokenTree>();
             for(int i = 0; i < executingLines.Count; ++i)
             { 
                 List<Token> execLine = executingLines[i];
                 TokenTree rootLineNode = TokenTree.EatTokensIntoTree(execLine);
-                treeLines.Add(rootLineNode);
+                //treeLines.Add(rootLineNode);
+
+                TokenAST exprAST = builder.ProcessFunctionExpression(build, this, rootLineNode);
+                if(exprAST == null)
+                { 
+                    // We shouldn't have received null, we should have thrown before this
+                    throw new SynthExceptionImpossible(""); //TODO:
+                }
+                this.ast.branches.Add(exprAST);
+
+                List<byte> fnBCBytes = new List<byte>();
+                builder.BuildBSFunction(this, this.ast, fnBCBytes);
+
+                this.fnBin = fnBCBytes.ToArray();
             }
 
-            builder.ProcessContextTokens(build, this, treeLines);
 
             return builder;
         }

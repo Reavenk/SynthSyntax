@@ -6,6 +6,9 @@ namespace PxPre.SynthSyn
 {
     public class WASMBuild
     {
+        /// <summary>
+        /// 
+        /// </summary>
         public struct FunctionType
         { 
             public readonly int index;
@@ -20,14 +23,15 @@ namespace PxPre.SynthSyn
             }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         public class FunctionInfo
         { 
             public readonly int typeIndex;
             public readonly SynthFuncDecl function;
             public int functionIndex;
             public bool imported;
-
-            public List<WASM.Bin.TypeID> localTypes = new List<WASM.Bin.TypeID>();
 
             public FunctionInfo(SynthFuncDecl function, int typeIndex, bool imported)
             { 

@@ -8,6 +8,40 @@ namespace PxPre.SynthSyn
     { 
         SetValue,
 
+        // Root AST node for function declarations. Will also have the 
+        FunctionDecl,
+
+        SetAfterAdd,
+        SetAfterSub,
+        SetAfterMul,
+        SetAfterDiv,
+        SetAfterMod,
+        SetAfterBitOr,
+        SetAfterBitAnd,
+        SetAfterBitXor,
+        SetAfterShiftL,
+        SetAfterShiftR,
+
+        Index,
+
+        IfStatement,
+        WhileStatement,
+        ForStatement,
+        DoWhileStatement,
+
+        Add,
+        Sub,
+        Mul,
+        Div,
+        Mod,
+
+        BitOr,
+        BitAnd,
+        BitXor,
+        BitInv,
+        BitShiftL,
+        BitShiftR,
+
         Unprocessed,
 
         RegisterVar,
@@ -36,12 +70,6 @@ namespace PxPre.SynthSyn
         DoubleToUInt64,
         DoubleToFloat,
 
-        Add,
-        Sub,
-        Mul,
-        Div,
-        Mod,
-
         Cast_Int,
         Cast_UInt,
         Cast_Int8,
@@ -64,7 +92,6 @@ namespace PxPre.SynthSyn
         CallGlobalFn,
 
         DefaultParam,
-
 
     }
 }

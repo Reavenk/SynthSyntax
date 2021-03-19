@@ -6,6 +6,14 @@ namespace PxPre.SynthSyn
 {
     public class TokenTree
     { 
+        /// <summary>
+        /// The token the tree was created from. 
+        /// 
+        /// Used for:
+        /// - Parsing when building the AST.
+        /// - Validation.
+        /// - A reference to the source file when throwing syntax errors.
+        /// </summary>
         public Token root;
 
         // Only used for special nestings keywords:
@@ -140,24 +148,67 @@ namespace PxPre.SynthSyn
                 return ret;
             }
 
-            while (tokens.Count > 0)
+            while (tokens.Count > 0) 
             {
+                if(tokens[0].MatchesSymbol(";") == true)
+                { 
+                    if(tokens.Count == 1)
+                        break;
+
+                    throw new SynthExceptionSyntax(tokens[0], "Unexpected semicolon");
+                }
+
                 if (tokens[0].MatchesSymbol(")") == true)
-                    throw new System.Exception($"Unexpected end parenthesis on line {tokens[0].line}.");
+                    throw new SynthExceptionSyntax(tokens[0], "Unexpected end parenthesis.");
 
                 if (tokens[0].MatchesSymbol("]") == true)
-                    throw new System.Exception($"Unexpected end bracket on line {tokens[0].line}.");
+                    throw new SynthExceptionSyntax(tokens[0], "Unexpected end bracket.");
 
                 if (tokens[0].MatchesSymbol("}") == true)
-                    throw new System.Exception($"Unexpected end brace on line {tokens[0].line}.");
+                    throw new SynthExceptionSyntax(tokens[0], "Unexpected end brace.");
 
-                if (
-                    tokens[0].MatchesSymbol("(") ||
-                    tokens[0].MatchesSymbol("[") ||
-                    tokens[0].MatchesSymbol("{"))
+                // All the nesting calls are pretty much duplicates. For now we'll allow
+                // the duplication, but may refactor later. 
+                //
+                // ATM we'll be lucky if everything parses and functions correctly - regardless
+                // of how clean and consolidated things are.
+                // (wleu 03/18/2021)
+                if (tokens[0].MatchesSymbol("(")  == true)
                 {
+                    // It's either a cast, or region for function parameters.
                     int scopeIdx = 0;
-                    Parser.MovePastScope(ref scopeIdx, tokens, tokens[0].fragment, new HashSet<string>());
+                    Parser.MovePastScope(ref scopeIdx, tokens, ")", null); 
+
+                    TokenTree tt = new TokenTree();
+                    tt.root = tokens[0];
+                    tt.toksToProcess = tokens.GetRange(1, scopeIdx - 2);
+                    tokens.RemoveRange(0, scopeIdx);
+
+                    nodes.Add(tt);
+                }
+                else if(tokens[0].MatchesSymbol("[") == true)
+                {
+                    // For now, it's just an indexing. This should evaluate
+                    // to one tree expression.
+                    int scopeIdx = 0;
+                    Parser.MovePastScope(ref scopeIdx, tokens, "]", null);
+
+                    TokenTree tt = new TokenTree();
+                    tt.root = tokens[0];
+                    tt.toksToProcess = tokens.GetRange(1, tokens.Count - 2);
+                    tokens.RemoveRange(0, tokens.Count);
+
+                    nodes.Add(tt);
+                }
+                else if(tokens[0].MatchesSymbol("{") == true)
+                {
+                    // Outside of a function declaration, an if/for/while/etc construct, 
+                    // it's just an anonymous scope.
+                    //
+                    // This should evaluate to an arbitrary number of tree expressions
+                    // as lines of function body code.
+                    int scopeIdx = 0;
+                    Parser.MovePastScope(ref scopeIdx, tokens, "]", null);
 
                     TokenTree tt = new TokenTree();
                     tt.root = tokens[0];
@@ -217,7 +268,11 @@ namespace PxPre.SynthSyn
             while (nodes.Count > 0)
             { 
                 if(nodes[nodes.Count - 1].root.Matches( TokenType.tySymbol, ";") == true)
+                {
                     nodes.RemoveAt(nodes.Count - 1);
+                    continue;
+                }
+                break;
             }
 
             if(nodes.Count == 0)
@@ -238,7 +293,8 @@ namespace PxPre.SynthSyn
                     nodes[i].root.Matches(TokenType.tySymbol, "|="  ) == true ||
                     nodes[i].root.Matches(TokenType.tySymbol, "^="  ) == true ||
                     nodes[i].root.Matches(TokenType.tySymbol, "&="  ) == true ||
-                    nodes[i].root.Matches(TokenType.tySymbol, "~="  ) == true)
+                    nodes[i].root.Matches(TokenType.tySymbol, ">>=" ) == true ||
+                    nodes[i].root.Matches(TokenType.tySymbol, "<<=" ) == true )
                 {
                     return CreatePivot(nodes, i, true);
                 }
@@ -308,21 +364,66 @@ namespace PxPre.SynthSyn
                 }
             }
 
-            for (int i = nodes.Count - 1; i >= 0; --i)
+            // This might still need some figuring out, but if we're at the start
+            // of an expression (with a type inside) then it's a cast.
+            if(nodes[0].root.MatchesSymbol("(") == true)
+            { 
+                nodes[0].keyword = "cast";
+                nodes[0].nodes.AddRange(nodes.GetRange(1, nodes.Count - 1));
+                nodes.RemoveRange(1, nodes.Count - 1);
+            }
+
+            // TODO:
+            // To be refactored for more rigerous syntax processing. Right now we 
+            // work from the backwards inwards; but really at this point we should 
+            // be consuming the end - and if we can't process the very last item, 
+            // things are already FUBARED.
+            for (int i = nodes.Count - 1; i >= 0 ; --i)
             {
-                if ( nodes[i].root.Matches(TokenType.tySymbol, ".") == true )
+                
+                if (nodes[i].root.Matches(TokenType.tySymbol, ".") == true)
                 {
                     return CreatePivot(nodes, i, foundEquals);
                 }
-            }
-
-
-            for (int i = 0; i < nodes.Count - 1; ++i)
-            { 
-                if(
-                    nodes[i].root.Matches(TokenType.tyWord) == true && 
-                    nodes[i].root.MatchesSymbol("(") == true)
+                else if (nodes[i].root.MatchesSymbol("(") == true)
                 { 
+                    // Either a cast or function parameters. Either way, we separate with a comma for now.
+                    TokenTree nodeIdx = new TokenTree("paren");
+                    nodeIdx.root = nodes[i].root;
+
+                    List<Token> parenToks = nodes[i].toksToProcess;
+                    while(parenToks.Count > 0)
+                    { 
+                        int iter = 0;
+                        Parser.MovePastScopeTComma(ref iter, parenToks);
+                        nodes[i].nodes.Add(EatTokensIntoTree(parenToks.GetRange(0, iter)));
+                        parenToks.RemoveRange(0, iter);
+                    }
+
+                    List<TokenTree> pre = nodes.GetRange(0, i);
+                    nodeIdx.nodes.Add(nodes[i]);
+                    nodeIdx.nodes.Add(ConsolidateTokenTree(pre, true));
+
+                    return nodeIdx;
+
+                }
+                else if(nodes[i].root.MatchesSymbol("[") == true)
+                { 
+                    // The new indexing item. We don't use the original (nodes[i]) because
+                    // we need to have seperate and distinct tree items - the AST being 
+                    // indexed (the stuff to the left of the []), and the AST for the indexing 
+                    // key (the stuff inside the []).
+                    TokenTree nodeIdx = new TokenTree("index");
+                    // The parsed token in the same.
+                    nodeIdx.root = nodes[i].root;
+                    // Break down the original's children as roots
+                    nodes[i].nodes.Add(ConsumeBody(nodes[i].toksToProcess, 0));
+                    // Everything that builds up the thing to index is built as a recursive call.
+                    
+                    List<TokenTree> pre = nodes.GetRange(0, i);
+                    nodeIdx.nodes.Add(ConsolidateTokenTree(pre, true));
+
+                    return nodeIdx;
                 }
             }
 
@@ -341,10 +442,12 @@ namespace PxPre.SynthSyn
 
         }
 
-        public static void ThrowIfAtEdge(List<TokenTree> nodes, int index)
+        public static void ThrowIfAtEdge(List<TokenTree> nodes, int index, bool gstart = true, bool gend = true)
         { 
-            if(index <= 0 || index >= nodes.Count - 1)
+            if((gstart == true && index <= 0) || (gend == true && index >= nodes.Count - 1))
+            {
                 throw new SynthExceptionSyntax(nodes[index].root, $"Token {nodes[index].root.fragment} found at an invalid position.");
+            }
         }
     }
 }

@@ -4,8 +4,9 @@ using UnityEngine;
 
 namespace PxPre.SynthSyn
 {
-    public abstract class Parser
+    public static class Parser
     {
+        
         public static bool Matches(List<Token> tokens, int idx, params TkScan [] eles)
         { 
             if(tokens.Count <= idx + eles.Length)
@@ -135,15 +136,38 @@ namespace PxPre.SynthSyn
         /// </summary>
         /// <param name="idx"></param>
         /// <param name="tokens"></param>
-        public static void MovePastScopeTComma(ref int idx, List<Token> tokens)
+        public static void MovePastScopeTComma(ref int idx, List<Token> tokens, bool allowEnd = true)
         {
             HashSet<string> terminator = new HashSet<string> { "," };
-            MovePastScope(ref idx, tokens, "}", terminator);
+            MovePastScope(ref idx, tokens, "}", terminator, allowEnd);
 
         }
 
-        public static void MovePastScope(ref int idx, List<Token> tokens, string endScope, HashSet<string> termSymFrags)
+        /// <summary>
+        /// Move to the end of the token scope.
+        /// 
+        /// Given the nesting with (, { and [ characters, move to the end, making 
+        /// sure we don't end prematurely in a nest.
+        /// 
+        /// The function can end either at the ending symbol. or at specified 
+        /// sentinel tokens at the highest nesting.
+        /// </summary>
+        /// <param name="idx">The index location.</param>
+        /// <param name="tokens">The tokens to parse through.</param>
+        /// <param name="endScope">The ending character.</param>
+        /// <param name="termSymFrags">
+        /// The sentinel character to stop at. If null, the function terminates
+        /// as soon as it enters a scope and returns back out of the highest scope.
+        /// </param>
+        public static void MovePastScope(ref int idx, List<Token> tokens, string endScope, HashSet<string> termSymFrags, bool allowEnd = false)
         {
+            // TBH, this function isn't cleanly implemented or defined.
+            // When everything is off the ground, it should be respeced,
+            // and rewritten in a cleaner manner.
+            // (wleu 03/18/2021)
+
+            // TODO: We may want to add these nests to a small utility 
+            // management struct.
             int squareNest = 0;
             int parenNest = 0;
             int curlNest = 0;
@@ -153,11 +177,19 @@ namespace PxPre.SynthSyn
                 bool decr = false;
 
                 if (idx >= tokens.Count)
+                {
+                    if(allowEnd == true && squareNest == 0 && parenNest == 0 && curlNest == 0)
+                        return;
+
                     throw new System.Exception("Unexpected end of file");
+                }
 
                 if (
-                    tokens[idx].Matches(TokenType.tySymbol) &&
-                    termSymFrags.Contains(tokens[idx].fragment) == true)
+                    termSymFrags != null &&
+                    (
+                        tokens[idx].Matches(TokenType.tySymbol) &&
+                        termSymFrags.Contains(tokens[idx].fragment) == true
+                    ))
                 {
 
                     if (squareNest == 0 && parenNest == 0 && curlNest == 0)
@@ -203,15 +235,27 @@ namespace PxPre.SynthSyn
                         throw new System.Exception($"Unexpected curl bracket mismatch on line {tokens[idx].line}.");
                 }
 
-                if(decr == true)
-                { 
-                    if(curlNest == 0)
+                if (decr == true)
+                {
+                    if (termSymFrags == null)
+                    {
+                        if (squareNest == 0 && parenNest == 0 && curlNest == 0)
+                        {
+                            ++idx;
+                            return;
+                        }
+                    }
+
+                    if (curlNest == 0)
                     { 
-                        if(tokens[idx].MatchesSymbol(endScope) == true)
+                        if (string.IsNullOrEmpty(endScope) == true || tokens[idx].MatchesSymbol(endScope) == true)
                         {
                             ++idx;
 
-                            while(
+                            if (termSymFrags == null)
+                                return;
+
+                            while (
                                 idx < tokens.Count &&
                                 tokens[idx].Matches( TokenType.tySymbol) && 
                                 termSymFrags.Contains(tokens[idx].fragment) == true)
@@ -309,7 +353,11 @@ namespace PxPre.SynthSyn
                     "!=",
                     "|=",
                     "&=",
-                    "^="
+                    "^=",
+                    "<<",
+                    ">>",
+                    "<<=",
+                    ">>=",
                 };
 
             List<Token> tokens = new List<Token>();
