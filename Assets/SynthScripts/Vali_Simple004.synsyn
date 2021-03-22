@@ -1,0 +1,20 @@
+// 
+//
+// >> Name: "Basic Addition"
+// >> Results : {18, 31, 48, 67, 90}
+//
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	LogTest(7 + 11);
+	LogTest(7 + 11 + 13);
+	LogTest(7 + 11 + 13 + 17);
+	LogTest(7 + 11 + 13 + 17 + 19);
+	LogTest(7 + 11 + 13 + 17 + 19 + 23);
+
+	EndTest();
+	
+}

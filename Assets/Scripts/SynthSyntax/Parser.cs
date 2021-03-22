@@ -235,36 +235,30 @@ namespace PxPre.SynthSyn
                         throw new System.Exception($"Unexpected curl bracket mismatch on line {tokens[idx].line}.");
                 }
 
-                if (decr == true)
+                if (decr == true && squareNest == 0 && parenNest == 0 && curlNest == 0)
                 {
                     if (termSymFrags == null)
                     {
-                        if (squareNest == 0 && parenNest == 0 && curlNest == 0)
-                        {
-                            ++idx;
-                            return;
-                        }
+                        ++idx;
+                        return;
                     }
 
-                    if (curlNest == 0)
-                    { 
-                        if (string.IsNullOrEmpty(endScope) == true || tokens[idx].MatchesSymbol(endScope) == true)
-                        {
-                            ++idx;
+                    if (string.IsNullOrEmpty(endScope) == true || tokens[idx].MatchesSymbol(endScope) == true)
+                    {
+                        ++idx;
 
-                            if (termSymFrags == null)
-                                return;
-
-                            while (
-                                idx < tokens.Count &&
-                                tokens[idx].Matches( TokenType.tySymbol) && 
-                                termSymFrags.Contains(tokens[idx].fragment) == true)
-                            { 
-                                ++idx;
-                            }
-
+                        if (termSymFrags == null)
                             return;
+
+                        while (
+                            idx < tokens.Count &&
+                            tokens[idx].Matches( TokenType.tySymbol) && 
+                            termSymFrags.Contains(tokens[idx].fragment) == true)
+                        { 
+                            ++idx;
                         }
+
+                        return;
                     }
                 }
 

@@ -1,8 +1,0 @@
-extern void LogTest(int loggedVal);
-extern void EndTest();
-
-entry DoTest()
-{
-	LogTest(0);
-	EndTest();
-}

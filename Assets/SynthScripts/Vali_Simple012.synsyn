@@ -1,0 +1,23 @@
+// Tests setting a local variable.
+//
+// >> Name: Setting Local Var
+// >> Results {18, 90, 264}
+//
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	int a = 7
+	int b = 11;
+	int c = 13;
+
+	LogTest(a + b);
+	LogTest(a * b + c);
+
+	c = c * c + a + b;
+	LogTest(a * b + c);
+
+	EndTest();
+}

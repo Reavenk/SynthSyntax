@@ -1,0 +1,21 @@
+// Test the __LINE__ macro.
+//
+// >> Name: Line Macro
+// >> Results {12, 13, 14, 15, 16, 144}
+//
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	LogTest(__LINE__);
+	LogTest(__LINE__);
+	LogTest(__LINE__);
+	LogTest(__LINE__);
+
+
+	LogTest(__LINE__ * 8);
+
+	EndTest();
+}

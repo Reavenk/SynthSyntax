@@ -50,5 +50,40 @@ namespace PxPre.SynthSyn
 
             return ret;
         }
+
+        public string DumpDiagnostic()
+        { 
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            this._DumpDiagnostic(sb, 0);
+
+            return sb.ToString();
+
+        }
+
+        public void _DumpDiagnostic(System.Text.StringBuilder sb, int depth)
+        { 
+            string indent = new string('\t', depth);
+
+            sb.Append($"{indent}TYPE : {this.astType}\n");
+            sb.Append($"{indent}TOKEN : {this.token.type} {this.token.fragment}\n");
+            sb.Append($"{indent}hasaddr[{this.hasAddress}]\n");
+
+            if(this.evaluatingType != null)
+                sb.Append($"{indent}EVTY : {this.evaluatingType.typeName}\n");
+
+            if(this.branches.Count == 0)
+            {
+                sb.Append($"{indent}{{}}\n");
+            }
+            else
+            {
+                sb.Append($"{indent}{{\n");
+
+                foreach(TokenAST ta in this.branches)
+                    ta._DumpDiagnostic(sb, depth + 1);
+
+                sb.Append($"{indent}}}\n");
+            }
+        }
     }
 }

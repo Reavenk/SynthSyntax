@@ -77,7 +77,7 @@ namespace PxPre.SynthSyn
         /// </summary>
         public bool isExtern = false;
 
-        public SythContextBuilder build = new SythContextBuilder();
+        public SynthContextBuilder build = new SynthContextBuilder();
 
         // TODO: Reorganize correctly (refactor)
         // Cached WASM types on the stack. This should map 1-to-1 with the stack variable listing
@@ -521,17 +521,29 @@ namespace PxPre.SynthSyn
             return this;
         }
 
-        public SythContextBuilder Build(WASMBuild build, SythContextBuilder parentContext)
+        public override SynthCanidateFunctions CastCanidateFunctions() 
+        { 
+            SynthCanidateFunctions retSelf = new SynthCanidateFunctions(this.GetStructScope());
+            retSelf.functions.Add(this);
+            return retSelf;
+        }
+
+        public SynthContextBuilder Build(WASMBuild build, SynthContextBuilder parentContext)
         {
-            SythContextBuilder builder = new SythContextBuilder();
+            SynthContextBuilder builder = new SynthContextBuilder();
 
             if(this.ast != null)
                 throw new SynthExceptionImpossible($"Attempting to build function {this.functionName} AST multiple times.");
+
+            SynthLog.Log("Entered SynthFuncDecl.Build().");
 
             // NOTE: For now functions are non-typed (in the SynthSyn language) and 
             // are non addressable.
             this.ast = new TokenAST(this.declPhrase[0], TokenASTType.FunctionDecl, this, null, false);
 
+            SynthLog.Log("Building function AST.");
+
+            List<byte> fnBCBytes = new List<byte>();
             //List<TokenTree> treeLines = new List<TokenTree>();
             for(int i = 0; i < executingLines.Count; ++i)
             { 
@@ -539,21 +551,33 @@ namespace PxPre.SynthSyn
                 TokenTree rootLineNode = TokenTree.EatTokensIntoTree(execLine);
                 //treeLines.Add(rootLineNode);
 
-                TokenAST exprAST = builder.ProcessFunctionExpression(build, this, rootLineNode);
+                // If it's a member function (not a static function) then full in the struct
+                // we belong to as a he invoking scope. Or else set it to null. Its syntax scope
+                // it still all the way where the source code is, but doesn't have a "this" member
+                // function.
+                SynthScope invokingScope = null;
+                if(this.isStatic == false)
+                    invokingScope = this.GetStructScope();
+
+                TokenAST exprAST = builder.ProcessFunctionExpression(build, invokingScope, this, rootLineNode);
                 if(exprAST == null)
                 { 
                     // We shouldn't have received null, we should have thrown before this
                     throw new SynthExceptionImpossible(""); //TODO:
                 }
                 this.ast.branches.Add(exprAST);
-
-                List<byte> fnBCBytes = new List<byte>();
-                builder.BuildBSFunction(this, this.ast, fnBCBytes);
-
-                this.fnBin = fnBCBytes.ToArray();
             }
 
+            SynthLog.Log(this.ast.DumpDiagnostic());
 
+            SynthLog.Log("Finished building AST.");
+            SynthLog.Log("Converting AST to binary WASM.");
+
+            builder.BuildBSFunction(this, this.ast, build, parentContext, fnBCBytes);
+            fnBCBytes.Add( (byte)WASM.Instruction.end);
+            this.fnBin = fnBCBytes.ToArray();
+
+            SynthLog.Log("Exiting SynthFuncDecl.Build().");
             return builder;
         }
 
@@ -563,6 +587,5 @@ namespace PxPre.SynthSyn
 
             base.GatherFunctionRegistration(builds);
         }
-
     }
 }

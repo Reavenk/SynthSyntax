@@ -1,0 +1,22 @@
+// Test multiple parameters.
+//
+// >> Name: 
+// >> Results {7, 11, 13}
+//
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	int a = 7
+	int b = 11;
+	int c = 13;
+
+	LogTest(a);
+	LogTest(b);
+	LogTest(c);
+
+	EndTest();
+	
+}

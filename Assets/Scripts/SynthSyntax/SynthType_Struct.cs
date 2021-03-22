@@ -195,5 +195,10 @@ namespace PxPre.SynthSyn
             base.Validate_AfterTypeAlignment(logIndent + 1);
             SynthLog.LogIndent(logIndent, $"End Struct.Validate_AfterTypeAlignment");
         }
+
+        public override SynthType_Struct GetStructScope()
+        {
+            return this;
+        }
     }
 }

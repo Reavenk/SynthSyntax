@@ -260,9 +260,11 @@ namespace PxPre.SynthSyn
 
         public byte [] BuildWASM()
         {
-            SythContextBuilder builder = new SythContextBuilder();
+            SynthLog.LogHeader("Entered BuildWASM() from SynthContext.cs");
 
-            WASMBuild build = new WASMBuild();
+            SynthContextBuilder builder = new SynthContextBuilder();
+
+            WASMBuild build = new WASMBuild(this);
 
             // Gather all the functions in the entire build, and make a collection
             // of their unique types.
@@ -282,6 +284,9 @@ namespace PxPre.SynthSyn
                 List<SynthFuncDecl> lst = kvp.Value;
                 foreach(SynthFuncDecl sfd in lst)
                 { 
+                    if(sfd.isExtern == true)
+                        continue;
+
                     sfd.Build(build, builder);
                 }
             }
@@ -428,29 +433,48 @@ namespace PxPre.SynthSyn
             {
                 List<byte> exportSection = new List<byte>();
 
-                exportSection.AddRange(WASM.BinParse.EncodeUnsignedLEB(0));
+                uint exportedCt = 0;
+                for(int i = 0; i < lstLocalFns.Count; ++i)
+                { 
+                    if( lstLocalFns[i].function.isStatic == false || lstLocalFns[i].function.isEntry == false)
+                        continue;
+
+                    ++exportedCt;
+                }
+
+                exportSection.AddRange(WASM.BinParse.EncodeUnsignedLEB(exportedCt));
+
+                // Iterate through it again the same way, but actually save out instead of count this time.
+                for (int i = 0; i < lstLocalFns.Count; ++i)
+                {
+                    if (lstLocalFns[i].function.isStatic == false || lstLocalFns[i].function.isEntry == false)
+                        continue;
+
+                    exportSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)lstLocalFns[i].function.functionName.Length));
+                    exportSection.AddRange(System.Text.Encoding.ASCII.GetBytes(lstLocalFns[i].function.functionName));
+                    exportSection.Add(0); // kind
+                    exportSection.AddRange(WASM.BinParse.EncodeUnsignedLEB(lstLocalFns[i].functionIndex));
+                }
 
                 fileContent.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)exportSection.Count));
                 fileContent.AddRange(exportSection);
             }
 
-            
-
             //
             //      --
             //      "Start"
             //////////////////////////////////////////////////
-            fileContent.Add((byte)WASM.Bin.Section.StartSec);
-            {
-                List<byte> startSection = new List<byte>();
-
-                int startFnID = 0;
-                startSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)startFnID));
-
-
-                fileContent.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)startSection.Count));
-                fileContent.AddRange(startSection);
-            }
+            //fileContent.Add((byte)WASM.Bin.Section.StartSec);
+            //{
+            //    List<byte> startSection = new List<byte>();
+            //
+            //    int startFnID = 0;
+            //    startSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)startFnID));
+            //
+            //
+            //    fileContent.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)startSection.Count));
+            //    fileContent.AddRange(startSection);
+            //}
 
             //
             //      --
@@ -480,12 +504,15 @@ namespace PxPre.SynthSyn
                 for (int i = 0; i < lstLocalFns.Count; ++i)
                 {
                     WASMBuild.FunctionInfo finfo = lstLocalFns[i];
+                    SynthFuncDecl fn = finfo.function;
+
+                    if(fn.fnBin == null)
+                        throw new SynthExceptionImpossible($"Attempting to save out WASM of function {fn.functionName} that hasn't been processed.");
 
                     List<byte> functionBody = new List<byte>();
 
                     functionBody.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)lstLocalFns[i].function.localTypes.Count)); // Local decl
-                    // TODO: Local types
-                    functionBody.Add((byte)WASM.Instruction.end);
+                    functionBody.AddRange(fn.fnBin);
 
                     // Function size
                     codeSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)functionBody.Count));

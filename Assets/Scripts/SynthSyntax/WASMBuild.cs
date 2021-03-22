@@ -30,14 +30,14 @@ namespace PxPre.SynthSyn
         { 
             public readonly int typeIndex;
             public readonly SynthFuncDecl function;
-            public int functionIndex;
+            public uint functionIndex;
             public bool imported;
 
             public FunctionInfo(SynthFuncDecl function, int typeIndex, bool imported)
             { 
                 this.function = function;
                 this.typeIndex = typeIndex;
-                this.functionIndex = -1; // Calculated later
+                this.functionIndex = uint.MaxValue; // Calculated later
                 this.imported = imported;
             }
         }
@@ -56,6 +56,15 @@ namespace PxPre.SynthSyn
 
         public List<FunctionInfo> functionInfos = new List<FunctionInfo>();
         public Dictionary<SynthFuncDecl, FunctionInfo> functionLookup = new Dictionary<SynthFuncDecl, FunctionInfo>();
+
+        public SynthContext rootContext;
+
+        public SynthStringRepo stringRepo = new SynthStringRepo();
+
+        public WASMBuild(SynthContext rootContext)
+        { 
+            this.rootContext = rootContext;
+        }
 
         public FunctionType TurnFnTypeIntoWASMType(SynthFuncDecl fnd)
         {
@@ -159,7 +168,7 @@ namespace PxPre.SynthSyn
 
             this.functionInfos = new List<FunctionInfo>();
 
-            int idx = 0;
+            uint idx = 0;
             foreach(FunctionInfo fi in origFnInfos)
             { 
                 if(fi.imported != true)
@@ -211,6 +220,15 @@ namespace PxPre.SynthSyn
             }
 
             return this.functionInfos.GetRange(idx, this.functionInfos.Count - idx);
+        }
+
+        public uint ? GetFunctionIndex(SynthFuncDecl fn)
+        { 
+            FunctionInfo fi;
+            if(this.functionLookup.TryGetValue(fn, out fi) == false)
+                return null;
+
+            return fi.functionIndex;
         }
     }
 }

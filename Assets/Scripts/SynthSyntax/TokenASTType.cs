@@ -8,6 +8,14 @@ namespace PxPre.SynthSyn
     { 
         SetValue,
 
+        GetGlobalVar,
+        GetMemberVar,
+        GetLocalVar,
+        GetParamVar,
+        GetFunction,
+        GetRegion,
+        GetThis,
+
         // Root AST node for function declarations. Will also have the 
         FunctionDecl,
 
@@ -46,12 +54,16 @@ namespace PxPre.SynthSyn
 
         RegisterVar,
 
+        // Declare type values - note this isn't the same
+        // as declaring variables of these types.
+        DeclBool,
         DeclUInt,
         DeclSInt,
         DeclUInt64,
         DeclSInt64,
         DeclFloat,
         DeclFloat64,
+        DeclString,
 
         UIntToFloat,
         UIntToDouble,

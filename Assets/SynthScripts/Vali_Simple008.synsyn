@@ -1,0 +1,18 @@
+// An exaggerated version of testing expression nesting with parenthesis.
+//
+// This is the same as Vali_Simple007, but the situation with the 
+//parenthesis is exagerated.
+//
+// >> Name: "Isolated Paren"
+// >> Results {288}
+//
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	LogTest((((5) + ((7))) * ((11 + 13))));
+	EndTest();
+	
+}

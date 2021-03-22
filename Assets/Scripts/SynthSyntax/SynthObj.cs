@@ -9,6 +9,7 @@ namespace PxPre.SynthSyn
         public int lineNumber = -1;
 
         public virtual SynthFuncDecl CastFuncDecl() { return null; }
+        public virtual SynthCanidateFunctions CastCanidateFunctions(){return null; }
         public virtual SynthContext CastContext() {return null; }
         public virtual SynthType CastType() {return null; }
         public virtual SynthVarValue CastVarDecl() { return null; }

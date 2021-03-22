@@ -1,0 +1,18 @@
+// Testing using parenthesis to control the order of operations.
+//	- Testing correct parsing of parenthesis.
+//	- Testing grouping of expressions in parenthesis.
+//	- Testing using parenthesis in expressions.
+//
+// >> Name: "Mul & Add Paren"
+// >> Results : {288}
+//
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	LogTest((5 + 7) * (11 + 13));
+	EndTest();
+	
+}

@@ -1,0 +1,28 @@
+// Some whitespace and comment tokenization tests, along
+// with multiple LogTest calls.
+//
+// >> Name: "Basic Multiple Params"
+// >> Results: {0, 1, 2, 3, 4, 5}
+//
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	// We'll also test some whitespace and comment
+	// passing in the tokenization.
+
+	LogTest(0);							// Test comment
+	LogTest(     1);					// Test comment
+	LogTest(2     );
+	LogTest(	3	);
+	LogTest(4 /*Test comment*/);
+
+	// Test comment
+
+	LogTest(5) /*Test comment*/;
+
+	EndTest( );
+	
+}

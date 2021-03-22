@@ -34,6 +34,11 @@ namespace PxPre.SynthSyn
 
         public int totalSize {get; private set; } = 0;
 
+        public void RegisterString(string str)
+        {
+            this.GetStringInfo(str);
+        }
+
         public int GetStringIndex(string str)
         {
             return this.GetStringInfo(str).index;

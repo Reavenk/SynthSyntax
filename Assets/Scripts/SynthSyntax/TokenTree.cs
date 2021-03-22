@@ -6,6 +6,13 @@ namespace PxPre.SynthSyn
 {
     public class TokenTree
     { 
+        // These properties that are shortcuts into the this.root members
+        // aren't actually meant to be used. They're included so the values
+        // will be visible in the debugger without needing to expand
+        // the this.root nest.
+        public TokenType _tokenType { get => this.root.type; }
+        public string _fragment { get => this.root.fragment; }
+
         /// <summary>
         /// The token the tree was created from. 
         /// 
@@ -33,6 +40,13 @@ namespace PxPre.SynthSyn
 
         public static TokenTree EatTokensIntoTree(List<Token> tokens)
         {
+            // When we start processing the tokens here, these are already
+            // single-line expressions that have been separated by semicolons.
+            // We strip them out at this point if we see any, for the sake
+            // of making the rest of the process simpler.
+            while(tokens.Count > 0 && tokens[tokens.Count - 1].MatchesSymbol(";") == true)
+                tokens.RemoveAt(tokens.Count - 1);
+
             List<TokenTree> nodes = new List<TokenTree>();
 
             if(tokens.Count == 0)
@@ -177,7 +191,7 @@ namespace PxPre.SynthSyn
                 {
                     // It's either a cast, or region for function parameters.
                     int scopeIdx = 0;
-                    Parser.MovePastScope(ref scopeIdx, tokens, ")", null); 
+                    Parser.MovePastScope(ref scopeIdx, tokens, ")", null);
 
                     TokenTree tt = new TokenTree();
                     tt.root = tokens[0];
@@ -278,8 +292,17 @@ namespace PxPre.SynthSyn
             if(nodes.Count == 0)
                 throw new SynthExceptionImpossible("Consolidating tree nodes with a count of 0.");
 
-            if(nodes.Count == 1)
-                return nodes[0];
+            if(nodes[0].root.MatchesSymbol("(") == true)
+            { 
+                // TODO: Check for a cast here?
+                //if(nodes.Count != 1)
+                //    throw new SynthExceptionSyntax(nodes[0].root, "Unexpected extra symbols after parenthesis statement.");
+                //
+                //if(nodes[0].toksToProcess.Count == 0)
+                //    throw new SynthExceptionSyntax(nodes[0].root, "Empty parenthesis statement.");
+                //
+                //return EatTokensIntoTree(nodes[0].toksToProcess);
+            }
 
             for(int i = 0; i < nodes.Count; ++i)
             {
@@ -324,6 +347,16 @@ namespace PxPre.SynthSyn
             }
 
             for (int i = nodes.Count - 1; i >= 0; --i)
+            {
+                if (
+                    nodes[i].root.Matches(TokenType.tySymbol, "+") == true ||
+                    nodes[i].root.Matches(TokenType.tySymbol, "-") == true)
+                {
+                    return CreatePivot(nodes, i, foundEquals);
+                }
+            }
+
+            for (int i = nodes.Count - 1; i >= 0; --i)
             { 
                 if(
                     nodes[i].root.Matches(TokenType.tySymbol, "*") == true ||
@@ -342,15 +375,7 @@ namespace PxPre.SynthSyn
                 }
             }
 
-            for (int i = nodes.Count - 1; i >= 0; --i)
-            {
-                if (
-                    nodes[i].root.Matches(TokenType.tySymbol, "+") == true ||
-                    nodes[i].root.Matches(TokenType.tySymbol, "-") == true)
-                {
-                    return CreatePivot(nodes, i, foundEquals);
-                }
-            }
+            
 
             for (int i = nodes.Count - 1; i >= 0; --i)
             {
@@ -364,14 +389,38 @@ namespace PxPre.SynthSyn
                 }
             }
 
-            // This might still need some figuring out, but if we're at the start
-            // of an expression (with a type inside) then it's a cast.
-            if(nodes[0].root.MatchesSymbol("(") == true)
+            if(nodes[0].root.Matches(TokenType.tySymbol, "(") == true)
             { 
-                nodes[0].keyword = "cast";
-                nodes[0].nodes.AddRange(nodes.GetRange(1, nodes.Count - 1));
-                nodes.RemoveRange(1, nodes.Count - 1);
+                TokenTree retParen = null;
+                if(nodes[0].toksToProcess.Count == 1)
+                { 
+                    // If a single word is in parenthesis, it's a cast.
+                    if(nodes[0].toksToProcess[0].Matches(TokenType.tyWord) == true)
+                    {
+                        retParen = new TokenTree("cast");
+                        retParen.root = nodes[0].toksToProcess[0];
+                    }
+                }
+                // A nested expression (including what could still be a cast)
+                if(retParen == null) 
+                    retParen = EatTokensIntoTree(nodes[0].toksToProcess);
+
+                // if the entire phrase is inside a parenthesis, relay it back.
+                if(nodes.Count == 1)
+                    return retParen;
+
+                if(retParen.keyword != null)
+                    throw new SynthExceptionSyntax(nodes[0].root, "Expected a cast, but did not find any expression to cast.");
+
+                List<TokenTree> castedExpr = nodes.GetRange(1, nodes.Count - 1);
+                TokenTree castedTree = ConsolidateTokenTree(castedExpr, true);
+                retParen.nodes.Add(castedTree);
+
+                return retParen;
             }
+
+            if (nodes.Count == 1)
+                return nodes[0];
 
             // TODO:
             // To be refactored for more rigerous syntax processing. Right now we 

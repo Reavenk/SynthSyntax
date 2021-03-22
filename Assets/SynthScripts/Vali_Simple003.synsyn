@@ -1,0 +1,15 @@
+// Testing simple addition with two integers.
+//
+// >> Name: "Basic Addition"
+// >> Results : {18}
+//
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	LogTest(7 + 11);
+	EndTest();
+	
+}

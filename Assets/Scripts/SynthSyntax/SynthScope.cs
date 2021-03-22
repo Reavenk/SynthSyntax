@@ -69,11 +69,13 @@ namespace PxPre.SynthSyn
 
         public SynthType_Struct ExtractVariableDecl(List<Token> tokens, int start, ref int end)
         { 
+            // TODO: Remove?
             return null;
         }
 
         public SynthFuncDecl ExtracFunctionDecl(List<Token> tokens, int start, ref int end)
         {
+            // TODO: Remove?
             return null;
         }
 
@@ -83,8 +85,8 @@ namespace PxPre.SynthSyn
             if(this.varLookups.TryGetValue(name, out ret) == true)
                 return ret;
 
-            if (recursion == true)
-                return this.GetVar(name, true);
+            if (recursion == true && this.parentScope != null)
+                return this.parentScope.GetVar(name, true);
 
             return null;
         }
@@ -97,6 +99,18 @@ namespace PxPre.SynthSyn
 
             if(recursion == true && this.parentScope != null)
                 return this.parentScope.GetType(typename, true);
+
+            return null;
+        }
+
+        public List<SynthFuncDecl> GetFunction(string functionName, bool recursion = true)
+        { 
+            List<SynthFuncDecl> ret;
+            if(this.functions.TryGetValue(functionName, out ret) == true)
+                return ret;
+
+            if(recursion == true && this.parentScope != null)
+                return this.parentScope.GetFunction(functionName, true);
 
             return null;
         }
@@ -357,6 +371,49 @@ namespace PxPre.SynthSyn
 
             foreach(var v in this.regions)
                 v.Value.GatherFunctionRegistration(builds);
+        }
+
+        public SynthCanidateFunctions GetCanidateFunctions(string functionName)
+        {
+            SynthCanidateFunctions canFns = new SynthCanidateFunctions(this);
+            this.FillFunctionList(functionName, this, canFns.functions);
+            return canFns;
+        }
+
+        public List<SynthFuncDecl> GetFunctionList(string functionName, SynthScope scope)
+        {
+            List<SynthFuncDecl> ret = new List<SynthFuncDecl>();
+            this.FillFunctionList(functionName, scope, ret);
+            return ret;
+        }
+
+        protected void FillFunctionList(string functionName, SynthScope scope, List<SynthFuncDecl> lst)
+        {
+            foreach (var v in this.functions)
+            {
+                if(v.Key != functionName)
+                    continue;
+
+                foreach(SynthFuncDecl sfn in v.Value)
+                {
+                    if (sfn.functionName != functionName)
+                        continue;
+
+                    if(scope == this || sfn.isStatic)
+                        lst.Add(sfn);
+                }
+            }
+
+            if (this.parentScope != null)
+                this.parentScope.FillFunctionList(functionName, scope, lst);
+        }
+
+        public virtual SynthType_Struct GetStructScope()
+        { 
+            if(this.parentScope == null)
+                return null;
+
+            return this.parentScope.GetStructScope();
         }
     }
 }

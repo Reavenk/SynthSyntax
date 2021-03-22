@@ -1,0 +1,17 @@
+// Testing multiplication and addition
+//	- Tests order of operations
+//	- Tests mixing artithmetic operators
+//
+// >> Name: "Mul & Add"
+// >> Results : {95}
+//
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	LogTest(5 + 7 * 11 + 13);
+	EndTest();
+	
+}
