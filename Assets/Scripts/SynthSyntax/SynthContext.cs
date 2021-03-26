@@ -262,8 +262,6 @@ namespace PxPre.SynthSyn
         {
             SynthLog.LogHeader("Entered BuildWASM() from SynthContext.cs");
 
-            SynthContextBuilder builder = new SynthContextBuilder();
-
             WASMBuild build = new WASMBuild(this);
 
             // Gather all the functions in the entire build, and make a collection
@@ -287,7 +285,7 @@ namespace PxPre.SynthSyn
                     if(sfd.isExtern == true)
                         continue;
 
-                    sfd.Build(build, builder);
+                    sfd.Build(build);
                 }
             }
 
@@ -509,15 +507,10 @@ namespace PxPre.SynthSyn
                     if(fn.fnBin == null)
                         throw new SynthExceptionImpossible($"Attempting to save out WASM of function {fn.functionName} that hasn't been processed.");
 
-                    List<byte> functionBody = new List<byte>();
-
-                    functionBody.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)lstLocalFns[i].function.localTypes.Count)); // Local decl
-                    functionBody.AddRange(fn.fnBin);
-
                     // Function size
-                    codeSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)functionBody.Count));
+                    codeSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)fn.fnBin.Length));
                     // Locals byte size
-                    codeSection.AddRange(functionBody);
+                    codeSection.AddRange(fn.fnBin);
                 }
 
                 fileContent.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)codeSection.Count));

@@ -29,40 +29,59 @@ namespace PxPre.SynthSyn
             NoValue,
             ValueOnStack,
             ValueOnMem,
+            AddrLocal,
             AddrParam,
             AddrOnHeap,
             AddrOnMemStack,
         }
 
-        public struct ValueRef
+        public class ValueRef : SynthObj
         { 
             public ValueLoc valLoc;
+
+            /// <summary>
+            /// The local index on the stack - 
+            /// or if the variable doesn't exist on the stack, the pointer
+            /// to it.
+            /// </summary>
             public int idx;
+
+            /// <summary>
+            /// The number of bytes on the memory -
+            /// or if the variable doesn't exist on the stack, the memory.
+            /// </summary>
+            public int byteAlign;
+
+            /// <summary>
+            /// The global scope version of idx;
+            /// </summary>
+            public int fnIdx;
+
+            /// <summary>
+            /// The global scope version of fnByteAlign.
+            /// </summary>
+            public int fnByteAlign;
+
+            /// <summary>
+            /// The pointer indirection amount. A value of 0 is the actual variable
+            /// value. A value of 1 is a pointer. A value of 2 is a pointer to a 
+            /// pointer, etc.
+            /// </summary>
+            public int pointerAmt = 0;
+
+            /// <summary>
+            /// How to interpret the ValueRef.
+            /// </summary>
             public SynthType varType;
 
-            public ValueRef(ValueLoc valLoc, int idx, SynthType varType)
+            public ValueRef(ValueLoc valLoc, int idx, int byteAlign, SynthType varType, int pointerAmt = 0)
             { 
                 this.valLoc = valLoc;
                 this.idx = idx;
+                this.byteAlign = byteAlign;
                 this.varType = varType;
+                this.pointerAmt = pointerAmt;
             }
-        }
-
-        public class StackVar
-        { 
-            public string varName;
-            public SynthVarValue variable;
-            public StackType location;
-            public int alignment;
-        }
-
-        public struct StackAlign
-        { 
-            public int locStkSize;
-            public int locStkAlign;
-
-            public int memStkSize;
-            public int memStkAlign;
         }
 
         /// <summary>
@@ -70,14 +89,18 @@ namespace PxPre.SynthSyn
         /// </summary>
         public int currentStackSize = 0;
 
-
+        // TODO: Because of technical reason of the language beeing able to freely take the
+        // address of any parameter in a generic way, parameters directly on the local stack
+        // are probably not going to be supported, and everything is going to be on the memory stack.
+        public int totalLocalStackBytes = 0;
         public int totalLocalStack = 0;
-        public List<StackAlign> locStkEle = new List<StackAlign>();
-        public Dictionary<string, StackVar> locStkVars = new Dictionary<string, StackVar>();
+        public List<ValueRef> locStkEle = new List<ValueRef>();
+        public Dictionary<string, ValueRef> locStkVars = new Dictionary<string, ValueRef>();
 
+        public int totalMemoryStackBytes = 0;
         public int totalMemoryStack = 0;
-        public List<StackAlign> memStkEle = new List<StackAlign>();
-        public Dictionary<string, StackVar> memStkVars = new Dictionary<string, StackVar>();
+        public List<ValueRef> memStkEle = new List<ValueRef>();
+        public Dictionary<string, ValueRef> memStkVars = new Dictionary<string, ValueRef>();
 
         List<TokenAST> asts = new List<TokenAST>();
 
@@ -121,7 +144,13 @@ namespace PxPre.SynthSyn
                 new OperatorInfo("/",   TokenASTType.Div),
                 new OperatorInfo("%",   TokenASTType.Mod)};
 
-        
+        public readonly SynthContextBuilder parent;
+
+        public SynthContextBuilder(SynthContextBuilder parent)
+        { 
+            this.parent = parent;
+        }
+
 
         TokenAST ProcessLogic(SynthScope scope, TokenTree tt)
         { 
@@ -144,6 +173,79 @@ namespace PxPre.SynthSyn
             throw new SynthExceptionSyntax(tt.root, "Unknown syntax.");
         }
 
+        void AddLocalVariable(Token declTok, SynthType type, string varName)
+        {
+            // TODO: Validate varName isn't a reserved word
+
+            if( 
+                this.locStkVars.ContainsKey(varName) == true || 
+                this.memStkVars.ContainsKey(varName) == true)
+            { 
+                throw new SynthExceptionSyntax(declTok, "Variable name already exists.");
+            }
+
+            if (type.intrinsic == true)
+            {
+                // If we're dealing with an intrinsic value type, they're either 
+                // 4 or 8 bytes, and can fit on the actual WASM stack.
+                ValueRef vr = new ValueRef(ValueLoc.AddrLocal, locStkEle.Count, this.totalLocalStack, type);
+                this.locStkEle.Add(vr);
+                this.locStkVars.Add(varName, vr);
+                this.totalLocalStack += type.GetByteSize();
+            }
+            else
+            { 
+                // Everything that's complexgets put on the secondary stack in the WASM mem
+                // section. The biggest issue we're trying to solve with the secondary stack is
+                // arbitrary byte alignment. A traditional WASM stack can't run through variable
+                // bytes, and only allows alignments that are a multiple of 4.
+                ValueRef vr = new ValueRef(ValueLoc.ValueOnMem, memStkEle.Count, this.totalMemoryStack, type);
+                this.memStkEle.Add(vr);
+                this.memStkVars.Add(varName, vr);
+                this.totalMemoryStack += type.GetByteSize();
+            }
+        }
+
+        public ValueRef GetLocalVariable(string name, bool recursive = true)
+        { 
+            ValueRef vrRet;
+            if(this.locStkVars.TryGetValue(name, out vrRet) == true)
+                return vrRet;
+
+            if(this.memStkVars.TryGetValue(name, out vrRet) == true)
+                return vrRet;
+
+            if(recursive == true && this.parent != null)
+                return this.parent.GetLocalVariable(name, true);
+
+            return null;
+        }
+
+        public void CompileAlignment()
+        { 
+            int locMax = 0;
+            int memMax = 0;
+
+            if(this.parent != null)
+            { 
+                locMax = this.parent.totalLocalStack;
+                memMax = this.parent.totalMemoryStackBytes;
+            }
+
+
+            for(int i = 0; i < this.locStkEle.Count; ++i)
+            {
+                ValueRef vr = this.locStkEle[i];
+                vr.fnIdx += locMax;
+            }
+
+            for(int i = 0; i < this.memStkEle.Count; ++i)
+            { 
+                ValueRef vr = this.memStkEle[i];
+                vr.fnByteAlign += memMax;
+            }
+        }
+
         TokenAST ProcessAssignTree(SynthScope scope, TokenTree tt)
         {
             foreach (OperatorInfo oi in OperatorsAssign)
@@ -158,7 +260,7 @@ namespace PxPre.SynthSyn
                         right.evaluatingType.intrinsic == true)
                     {
                         EnsureIntrinsicCompatibility(left, ref right);
-                        return new TokenAST(tt.root, oi.intrinsicOperator, null, null, false, left, right);
+                        return new TokenAST(tt.root, this, oi.intrinsicOperator, null, null, false, left, right);
                     }
                     else
                         return GenerateOperatorAST(oi.tokStr, tt.root, left, right);
@@ -182,7 +284,7 @@ namespace PxPre.SynthSyn
                         right.evaluatingType.intrinsic == true)
                     {
                         EnsureIntrinsicCompatibility(left, ref right);
-                        return new TokenAST(tt.root, oi.intrinsicOperator, null, scope.GetType("bool"), false, left, right);
+                        return new TokenAST(tt.root, this, oi.intrinsicOperator, null, scope.GetType("bool"), false, left, right);
                     }
                     else
                         return GenerateOperatorAST(oi.tokStr, tt.root, left, right);
@@ -208,7 +310,7 @@ namespace PxPre.SynthSyn
                         right.evaluatingType.intrinsic == true)
                     {
                         EnsureIntrinsicCompatibility(left, ref right);
-                        return new TokenAST(tt.root, oi.intrinsicOperator, null, scope.GetType("bool"), false, left, right);
+                        return new TokenAST(tt.root, this, oi.intrinsicOperator, null, scope.GetType("bool"), false, left, right);
                     }
                     else
                         return GenerateOperatorAST(oi.tokStr, tt.root, left, right);
@@ -234,7 +336,7 @@ namespace PxPre.SynthSyn
                         right.evaluatingType.intrinsic == true)
                     {
                         EnsureIntrinsicCompatibility(left, ref right);
-                        return new TokenAST(tt.root, oi.intrinsicOperator, null, left.evaluatingType, false, left, right);
+                        return new TokenAST(tt.root, this, oi.intrinsicOperator, null, left.evaluatingType, false, left, right);
                     }
                     else
                         return GenerateOperatorAST(oi.tokStr, tt.root, left, right);
@@ -258,7 +360,7 @@ namespace PxPre.SynthSyn
                         right.evaluatingType.intrinsic == true)
                     {
                         EnsureIntrinsicCompatibility(left, ref right);
-                        return new TokenAST(tt.root, oi.intrinsicOperator, null, left.evaluatingType, false, left, right);
+                        return new TokenAST(tt.root, this, oi.intrinsicOperator, null, left.evaluatingType, false, left, right);
                     }
                     else
                         return GenerateOperatorAST(oi.tokStr, tt.root, left, right);
@@ -275,16 +377,16 @@ namespace PxPre.SynthSyn
             switch(tt.root.type)
             { 
                 case TokenType.tyDouble:
-                    return new TokenAST(tt.root, TokenASTType.DeclFloat64, null, scope.GetType("double"), false);
+                    return new TokenAST(tt.root, this, TokenASTType.DeclFloat64, null, scope.GetType("double"), false);
 
                 case TokenType.tyFloat:
-                    return new TokenAST(tt.root, TokenASTType.DeclFloat, null, scope.GetType("double"), false);
+                    return new TokenAST(tt.root, this, TokenASTType.DeclFloat, null, scope.GetType("double"), false);
 
                 case TokenType.tyInt:
-                    return new TokenAST(tt.root, TokenASTType.DeclSInt, null, scope.GetType("int"), false);
+                    return new TokenAST(tt.root, this, TokenASTType.DeclSInt, null, scope.GetType("int"), false);
 
                 case TokenType.tyLong:
-                    return new TokenAST(tt.root, TokenASTType.DeclSInt64, null, scope.GetType("int64"), false);
+                    return new TokenAST(tt.root, this, TokenASTType.DeclSInt64, null, scope.GetType("int64"), false);
             }
 
             if(ret == null)
@@ -296,12 +398,12 @@ namespace PxPre.SynthSyn
             return ret;
         }
 
-        public static TokenAST GenerateOperatorAST(string operatorName, Token tokOp, TokenAST left, TokenAST right)
+        public TokenAST GenerateOperatorAST(string operatorName, Token tokOp, TokenAST left, TokenAST right)
         {
             // First check non-reversible entries.
             SynthFuncDecl sfd = left.evaluatingType.GetOperator(operatorName, right.evaluatingType, SynthScope.OperatorReversing.OnlyNonReversible);
             if (sfd != null)
-                return new TokenAST(tokOp, TokenASTType.CallMember, sfd, sfd.returnType, false, left, right);
+                return new TokenAST(tokOp, this, TokenASTType.CallMember, sfd, sfd.returnType, false, left, right);
 
             switch (operatorName)
             {
@@ -326,7 +428,7 @@ namespace PxPre.SynthSyn
             // If we couldn't find a working operator, try looking for reversible ones.
             sfd = left.evaluatingType.GetOperator(operatorName, left.evaluatingType, SynthScope.OperatorReversing.OnlyReversible);
             if (sfd != null)
-                return new TokenAST(tokOp, TokenASTType.CallMember, sfd, sfd.returnType, false, right, left);
+                return new TokenAST(tokOp, this, TokenASTType.CallMember, sfd, sfd.returnType, false, right, left);
 
             throw new SynthExceptionSyntax(tokOp, "Could not find operator.");
         }
@@ -346,6 +448,7 @@ namespace PxPre.SynthSyn
         /// will be thrown. It is expected in the future for nulls to never be thrown, and any error
         /// or null result to end with a throw.</remarks>
         public TokenAST ProcessFunctionExpression(
+            List<SynthContextBuilder> regCtxBuilders,
             WASMBuild build, 
             SynthScope invokingContext, 
             SynthFuncDecl function, 
@@ -354,26 +457,26 @@ namespace PxPre.SynthSyn
             if(node.root.Matches(TokenType.tyBool) == true)
             {
                 EnsureNoTreeChildNodes(node);
-                return new TokenAST(node.root, TokenASTType.DeclBool, null, build.rootContext.GetType("bool"), false);
+                return new TokenAST(node.root, this, TokenASTType.DeclBool, null, build.rootContext.GetType("bool"), false);
             }
             
             if(node.root.Matches(TokenType.tyInt) == true)
             {
                 EnsureNoTreeChildNodes(node);
                 // All ints are signed by default - they can be casted with the cast optimized out later.
-                return new TokenAST(node.root, TokenASTType.DeclSInt, null, build.rootContext.GetType("int"), false);
+                return new TokenAST(node.root, this, TokenASTType.DeclSInt, null, build.rootContext.GetType("int"), false);
             }
 
             if(node.root.Matches(TokenType.tyFloat) == true)
             {
                 EnsureNoTreeChildNodes(node);
-                return new TokenAST(node.root, TokenASTType.DeclFloat, null, build.rootContext.GetType("float"), false);
+                return new TokenAST(node.root, this, TokenASTType.DeclFloat, null, build.rootContext.GetType("float"), false);
             }
 
             if(node.root.Matches(TokenType.tyDouble) == true)
             {
                 EnsureNoTreeChildNodes(node);
-                return new TokenAST(node.root, TokenASTType.DeclFloat64, null, build.rootContext.GetType("double"), false);
+                return new TokenAST(node.root, this, TokenASTType.DeclFloat64, null, build.rootContext.GetType("double"), false);
             }
 
             if(node.root.Matches(TokenType.tyString) == true)
@@ -381,7 +484,7 @@ namespace PxPre.SynthSyn
                 EnsureNoTreeChildNodes(node);
                 build.stringRepo.RegisterString(node.root.fragment);
 
-                return new TokenAST(node.root, TokenASTType.DeclString, null, build.rootContext.GetType("string"), false);
+                return new TokenAST(node.root, this, TokenASTType.DeclString, null, build.rootContext.GetType("string"), false);
             }
 
             if(node.root.Matches(TokenType.tyWord) == true)
@@ -392,18 +495,66 @@ namespace PxPre.SynthSyn
                         throw new SynthExceptionSyntax(node.root, "this cannot be used in a static function.");
 
                     SynthType_Struct rootScope = function.GetStructScope();
-                    return new TokenAST(node.root, TokenASTType.GetThis, rootScope, rootScope, true);
+                    return new TokenAST(node.root, this, TokenASTType.GetThis, rootScope, rootScope, true);
                 }
 
-                // TODO: We need to figure out the scope so we know where to actually grab
-                // it from in memory alignment when we build WASM.
+                // If it matches a known type, we've detected the token is attempting
+                // to declare a variable in local scope.
+                SynthType sty = function.GetType(node.root.fragment);
+                if(sty != null)
+                { 
+                    if(node.nodes.Count < 2)
+                        throw new SynthExceptionImpossible("Local variable declaration missing variable name.");
+
+                    if(node.nodes[0].keyword != "varname") // TODO: Use const string
+                        throw new SynthExceptionImpossible("Pipeline for defining local variable names is corrupt.");
+
+                    this.AddLocalVariable(node.root, sty, node.nodes[0].root.fragment);
+
+                    TokenAST astDeclVar = new TokenAST(node.root, this, TokenASTType.RegisterLocalVar, null, sty, true);
+                    TokenAST astVarName = new TokenAST(node.nodes[0].root, this, TokenASTType.RegisterLocalVarName, null, null, false);
+                    
+                    astDeclVar.branches.Add(astVarName);
+                    if(node.nodes.Count > 1)
+                    {
+                        TokenAST astVarInit = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[1]);
+                        astDeclVar.branches.Add(astVarInit);
+
+                        if(node.nodes.Count > 2)
+                            throw new SynthExceptionImpossible("Variable declaration has invalid number of tree children.");
+                    }
+                    return astDeclVar;
+                }
+
+                // Compiler constant macros
+                if(node.root.fragment == "__LINE__")
+                {
+                    return new TokenAST(
+                        new Token(
+                            node.root.line, 
+                            node.root.line.ToString(), 
+                            TokenType.tyInt), 
+                        this, 
+                        TokenASTType.DeclSInt, 
+                        null, 
+                        build.rootContext.GetType("int"), 
+                        false);
+                }
+
+                ValueRef localVR = this.GetLocalVariable(node.root.fragment);
+                if(localVR != null)
+                    return new TokenAST(node.root, this, TokenASTType.GetLocalVar, localVR, localVR.varType, true);
+
                 SynthVarValue svv = function.GetVar(node.root.fragment);
                 if(svv != null)
-                    return new TokenAST(node.root, TokenASTType.GetLocalVar, svv, svv.type, true);
+                {
+                    // TODO: Check if we're in a function context.
+                    return new TokenAST(node.root, this, TokenASTType.GetMemberVar, svv, svv.type, true);
+                }
 
                 SynthCanidateFunctions canFns = function.GetCanidateFunctions(node.root.fragment);
                 if(canFns == null || canFns.functions.Count > 0)
-                    return new TokenAST(node.root, TokenASTType.GetFunction, canFns, null, false);
+                    return new TokenAST(node.root, this, TokenASTType.GetFunction, canFns, null, false);
 
                 // TODO: Getting scope
             }
@@ -426,14 +577,14 @@ namespace PxPre.SynthSyn
                     throw new SynthExceptionImpossible("if statement needs at least two trees, one for the predicate and one for the body statements.");
                 }
 
-                TokenAST pred = ProcessFunctionExpression(build, invokingContext, function, node.nodes[0]);
+                TokenAST pred = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
                 if(pred.evaluatingType == null || pred.evaluatingType.typeName != "bool")
                     throw new SynthExceptionSyntax(node.nodes[0].root, "If statement predicate did not evaluate to a bool.");
 
-                TokenAST astIf = new TokenAST(node.root, TokenASTType.IfStatement, null, null, false, pred);
+                TokenAST astIf = new TokenAST(node.root, this, TokenASTType.IfStatement, null, null, false, pred);
 
                 for(int i = 1; i < node.nodes.Count; ++i)
-                    astIf.branches.Add(ProcessFunctionExpression(build, invokingContext, function, node.nodes[i]));
+                    astIf.branches.Add(ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[i]));
 
                 return astIf;
             }
@@ -449,14 +600,14 @@ namespace PxPre.SynthSyn
                     throw new SynthExceptionImpossible("while statement needs at least two trees, one for the predicate and one for the body statements.");
                 }
 
-                TokenAST pred = ProcessFunctionExpression(build, invokingContext, function, node.nodes[0]);
+                TokenAST pred = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
                 if(pred.evaluatingType == null || pred.evaluatingType.typeName != "bool")
                     throw new SynthExceptionSyntax(node.nodes[0].root, "While statement predicate did not evaludate to a bool.");
 
-                TokenAST astWhile = new TokenAST(node.root, TokenASTType.WhileStatement, null, null, false, pred);
+                TokenAST astWhile = new TokenAST(node.root, this, TokenASTType.WhileStatement, null, null, false, pred);
 
                 for(int i = 1; i < node.nodes.Count; ++i)
-                    astWhile.branches.Add(ProcessFunctionExpression(build, invokingContext, function, node.nodes[i]));
+                    astWhile.branches.Add(ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[i]));
 
                 return astWhile;
             }
@@ -467,14 +618,14 @@ namespace PxPre.SynthSyn
                     throw new SynthExceptionImpossible("dowhile statement needs at least two trees, one for the body statements and one for the continue predicate.");
 
                 TokenTree ttLast = node.nodes[node.nodes.Count - 1];
-                TokenAST pred = ProcessFunctionExpression(build, invokingContext, function, ttLast);
+                TokenAST pred = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, ttLast);
                 if(pred.evaluatingType == null || pred.evaluatingType.typeName != "bool")
                     throw new SynthExceptionSyntax(ttLast.root, "dowhile statement predicate did not evaluate to a bool.");
 
-                TokenAST astDoWhile = new TokenAST(node.root, TokenASTType.DoWhileStatement, null, null, false);
+                TokenAST astDoWhile = new TokenAST(node.root, this, TokenASTType.DoWhileStatement, null, null, false);
 
                 for(int i = 0; i < node.nodes.Count - 1; ++i)
-                    astDoWhile.branches.Add(ProcessFunctionExpression(build, invokingContext, function, node.nodes[i]));
+                    astDoWhile.branches.Add(ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[i]));
 
                 astDoWhile.branches.Add(pred);
                 return astDoWhile;
@@ -485,14 +636,14 @@ namespace PxPre.SynthSyn
                 if(node.nodes.Count != 2)
                     throw new SynthExceptionImpossible("Equal needs exactly two trees to evaluate.");
 
-                TokenAST left = ProcessFunctionExpression(build, invokingContext, function, node.nodes[0]);
+                TokenAST left = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
                 if(left.hasAddress == false)
                     throw new SynthExceptionSyntax(node.nodes[0].root, "Left side of equation not addressable.");
 
-                TokenAST right = ProcessFunctionExpression(build, invokingContext, function, node.nodes[1]);
+                TokenAST right = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[1]);
                 EnsureIntrinsicCompatibility(left.evaluatingType, ref right);
 
-                TokenAST astEq = new TokenAST(node.root, TokenASTType.SetValue, null, left.evaluatingType, false, left, right);
+                TokenAST astEq = new TokenAST(node.root, this, TokenASTType.SetValue, null, left.evaluatingType, false, left, right);
                 return astEq;
             }
 
@@ -510,10 +661,13 @@ namespace PxPre.SynthSyn
 
                     List<TokenAST> astParams = new List<TokenAST>();
                     foreach(TokenTree tt in node.nodes[0].nodes)
-                        astParams.Add(this.ProcessFunctionExpression(build, invokingContext, function, tt));
+                    {
+                        TokenAST astParamVal = this.ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, tt);
+                        astParams.Add(astParamVal);
+                    }
 
                     // Default params not supported for now
-                    TokenAST caller = ProcessFunctionExpression(build, invokingContext, function, node.nodes[1]);
+                    TokenAST caller = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[1]);
                     SynthCanidateFunctions cfns = caller.synthObj.CastCanidateFunctions();
                     if(cfns == null)
                         throw new SynthExceptionSyntax(node.nodes[1].root, "Could not evaluate function");
@@ -567,76 +721,76 @@ namespace PxPre.SynthSyn
                 if (node.root.Matches(TokenType.tySymbol, "[") == false)
                     throw new SynthExceptionImpossible(""); // TODO:
 
-                TokenAST astKey = ProcessFunctionExpression(build, invokingContext, function, node.nodes[0]);
-                TokenAST astSrc = ProcessFunctionExpression(build, invokingContext, function, node.nodes[1]);
+                TokenAST astKey = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
+                TokenAST astSrc = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[1]);
                 EnsureTypeIsBitCompatible(astSrc.evaluatingType, node.nodes[1].root);
 
-                return new TokenAST(node.root, TokenASTType.Index, null, null, true, astSrc, astKey);
+                return new TokenAST(node.root, this, TokenASTType.Index, null, null, true, astSrc, astKey);
             }
 
             if (node.root.MatchesSymbol("+") == true)
             {
                 TokenAST left, right;
-                EnsureLeftAndRightCompatibility(build, invokingContext, function, node, out left, out right, true, false);
-                return new TokenAST(node.root, TokenASTType.Add, null, left.evaluatingType, false, left, right);
+                EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
+                return new TokenAST(node.root, this, TokenASTType.Add, null, left.evaluatingType, false, left, right);
             }
 
             if (node.root.MatchesSymbol("-") == true)
             {
                 TokenAST left, right;
-                EnsureLeftAndRightCompatibility(build, invokingContext, function, node, out left, out right, true, false);
-                return new TokenAST(node.root, TokenASTType.Sub, null, left.evaluatingType, false, left, right);
+                EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
+                return new TokenAST(node.root, this, TokenASTType.Sub, null, left.evaluatingType, false, left, right);
             }
 
             if (node.root.MatchesSymbol("*") == true)
             {
                 TokenAST left, right;
-                EnsureLeftAndRightCompatibility(build, invokingContext, function, node, out left, out right, true, false);
-                return new TokenAST(node.root, TokenASTType.Mul, null, left.evaluatingType, false, left, right);
+                EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
+                return new TokenAST(node.root, this, TokenASTType.Mul, null, left.evaluatingType, false, left, right);
             }
 
             if (node.root.MatchesSymbol("/") == true)
             {
                 TokenAST left, right;
-                EnsureLeftAndRightCompatibility(build, invokingContext, function, node, out left, out right, true, false);
-                return new TokenAST(node.root, TokenASTType.Div, null, left.evaluatingType, false, left, right);
+                EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
+                return new TokenAST(node.root, this, TokenASTType.Div, null, left.evaluatingType, false, left, right);
             }
 
             if (node.root.MatchesSymbol("%") == true)
             {
                 TokenAST left, right;
-                EnsureLeftAndRightCompatibility(build, invokingContext, function, node, out left, out right, true, false);
-                return new TokenAST(node.root, TokenASTType.Mod, null, left.evaluatingType, false, left, right);
+                EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
+                return new TokenAST(node.root, this, TokenASTType.Mod, null, left.evaluatingType, false, left, right);
             }
 
             if (node.root.MatchesSymbol("&") == true)
             {
                 TokenAST left, right;
-                EnsureLeftAndRightCompatibility(build, invokingContext, function, node, out left, out right, true, false);
+                EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new TokenAST(node.root, TokenASTType.BitAnd, null, left.evaluatingType, false, left, right);
+                return new TokenAST(node.root, this, TokenASTType.BitAnd, null, left.evaluatingType, false, left, right);
             }
 
             if (node.root.MatchesSymbol("|") == true)
             {
                 TokenAST left, right;
-                EnsureLeftAndRightCompatibility(build, invokingContext, function, node, out left, out right, true, false);
+                EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new TokenAST(node.root, TokenASTType.BitOr, null, left.evaluatingType, false, left, right);
+                return new TokenAST(node.root, this, TokenASTType.BitOr, null, left.evaluatingType, false, left, right);
             }
 
             if (node.root.MatchesSymbol("^") == true)
             {
                 TokenAST left, right;
-                EnsureLeftAndRightCompatibility(build, invokingContext, function, node, out left, out right, true, false);
+                EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new TokenAST(node.root, TokenASTType.BitXor, null, left.evaluatingType, false, left, right);
+                return new TokenAST(node.root, this, TokenASTType.BitXor, null, left.evaluatingType, false, left, right);
             }
 
             if (node.root.MatchesSymbol("~") == true)
@@ -644,88 +798,97 @@ namespace PxPre.SynthSyn
                 if(node.nodes.Count != 1)
                     throw new SynthExceptionSyntax(node.root, "~ operation expecting exactly 1 tree."); //Not a great error message
 
-                TokenAST evVal = ProcessFunctionExpression(build, invokingContext, function, node.nodes[0]);
+                TokenAST evVal = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
                 EnsureTypeIsBitCompatible(evVal.evaluatingType, node.nodes[0].root);
 
-                return new TokenAST(node.root, TokenASTType.BitInv, null, evVal.evaluatingType, false, evVal);
+                return new TokenAST(node.root, this, TokenASTType.BitInv, null, evVal.evaluatingType, false, evVal);
             }
 
             if (node.root.MatchesSymbol("+=") == true)
             {
                 TokenAST left, right;
-                EnsureLeftAndRightCompatibility(build, invokingContext, function, node, out left, out right, false, true);
-                return new TokenAST(node.root, TokenASTType.SetAfterAdd, null, null, false, left, right);
+                EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
+                return new TokenAST(node.root, this, TokenASTType.SetAfterAdd, null, null, false, left, right);
             }
 
             if (node.root.MatchesSymbol("-=") == true)
             {
                 TokenAST left, right;
-                EnsureLeftAndRightCompatibility(build, invokingContext, function, node, out left, out right, false, true);
-                return new TokenAST(node.root, TokenASTType.SetAfterSub, null, null, false, left, right);
+                EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
+                return new TokenAST(node.root, this, TokenASTType.SetAfterSub, null, null, false, left, right);
             }
 
             if (node.root.MatchesSymbol("*=") == true)
             {
                 TokenAST left, right;
-                EnsureLeftAndRightCompatibility(build, invokingContext, function, node, out left, out right, false, true);
-                return new TokenAST(node.root, TokenASTType.SetAfterMul, null, null, false, left, right);
+                EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
+                return new TokenAST(node.root, this, TokenASTType.SetAfterMul, null, null, false, left, right);
             }
 
             if (node.root.MatchesSymbol("/=") == true)
             {
                 TokenAST left, right;
-                EnsureLeftAndRightCompatibility(build, invokingContext, function, node, out left, out right, false, true);
-                return new TokenAST(node.root, TokenASTType.SetAfterDiv, null, null, false, left, right);
+                EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
+                return new TokenAST(node.root, this, TokenASTType.SetAfterDiv, null, null, false, left, right);
             }
 
             if (node.root.MatchesSymbol("%=") == true)
             {
                 TokenAST left, right;
-                EnsureLeftAndRightCompatibility(build, invokingContext, function, node, out left, out right, false, true);
+                EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
 
-                return new TokenAST(node.root, TokenASTType.SetAfterMod, null, null, false, left, right);
+                return new TokenAST(node.root, this, TokenASTType.SetAfterMod, null, null, false, left, right);
             }
 
             if (node.root.MatchesSymbol("&=") == true)
             {
                 TokenAST left, right;
-                EnsureLeftAndRightCompatibility(build, invokingContext, function, node, out left, out right, false, true);
+                EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new TokenAST(node.root, TokenASTType.SetAfterBitAnd, null, null, false, left, right);
+                return new TokenAST(node.root, this, TokenASTType.SetAfterBitAnd, null, null, false, left, right);
             }
 
             if (node.root.MatchesSymbol("|=") == true)
             {
                 TokenAST left, right;
-                EnsureLeftAndRightCompatibility(build, invokingContext, function, node, out left, out right, false, true);
+                EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new TokenAST(node.root, TokenASTType.SetAfterBitOr, null, null, false, left, right);
+                return new TokenAST(node.root, this, TokenASTType.SetAfterBitOr, null, null, false, left, right);
             }
 
             if (node.root.MatchesSymbol("^=") == true)
             {
                 TokenAST left, right;
-                EnsureLeftAndRightCompatibility(build, invokingContext, function, node, out left, out right, false, true);
+                EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new TokenAST(node.root, TokenASTType.SetAfterBitXor, null, null, false, left, right);
+                return new TokenAST(node.root, this, TokenASTType.SetAfterBitXor, null, null, false, left, right);
             }
 
             return null;
         }
 
-        public void EnsureLeftAndRightCompatibility(WASMBuild build, SynthScope invokingContext, SynthFuncDecl fnDecl, TokenTree tt, out TokenAST left, out TokenAST right, bool allowCastingLeft, bool leftRequireAddr)
+        public void EnsureLeftAndRightCompatibility(
+            List<SynthContextBuilder> regCtxBuilders, 
+            WASMBuild build, 
+            SynthScope invokingContext, 
+            SynthFuncDecl fnDecl, 
+            TokenTree tt, 
+            out TokenAST left, 
+            out TokenAST right, 
+            bool allowCastingLeft, 
+            bool leftRequireAddr)
         {
             if(tt.nodes.Count != 2)
                 throw new SynthExceptionSyntax(tt.root, $"Error parsing {tt.root.fragment}.");
 
-            left = ProcessFunctionExpression(build, invokingContext, fnDecl, tt.nodes[0]);
-            right = ProcessFunctionExpression(build, invokingContext, fnDecl, tt.nodes[1]);
+            left = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, fnDecl, tt.nodes[0]);
+            right = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, fnDecl, tt.nodes[1]);
 
             if(left == null || left.evaluatingType == null)
                 throw new SynthExceptionSyntax(tt.root, $"Error parsing {tt.root.fragment}, left side of equation does not evaluate to a type.");
@@ -778,7 +941,7 @@ namespace PxPre.SynthSyn
             }
         }
 
-        public static void EnsureIntrinsicCompatibility(TokenAST left, ref TokenAST right)
+        public void EnsureIntrinsicCompatibility(TokenAST left, ref TokenAST right)
         {
             EnsureIntrinsicCompatibility(left.evaluatingType, ref right);
         }
@@ -791,7 +954,7 @@ namespace PxPre.SynthSyn
         /// </summary>
         /// <param name="styLeft">The type the right needs to match.</param>
         /// <param name="right">The value who's type is being matched, or casted if necessary.</param>
-        public static bool EnsureIntrinsicCompatibility(SynthType styLeft, ref TokenAST right, bool throwOnFail = true)
+        public bool EnsureIntrinsicCompatibility(SynthType styLeft, ref TokenAST right, bool throwOnFail = true)
         {
             // If they're the same, no conversion needed.
             if(styLeft == right.evaluatingType)
@@ -816,7 +979,7 @@ namespace PxPre.SynthSyn
             {
                 if (styLeft.typeName == "double")
                 {
-                    TokenAST cast = new TokenAST(right.token, TokenASTType.Cast_Double, styLeft, styLeft, false, right);
+                    TokenAST cast = new TokenAST(right.token, this, TokenASTType.Cast_Double, styLeft, styLeft, false, right);
                     right = cast;
                     return true;
                 }
@@ -827,7 +990,7 @@ namespace PxPre.SynthSyn
             {
                 if (styLeft.typeName == "float")
                 {
-                    TokenAST cast = new TokenAST(right.token, TokenASTType.Cast_Float, styLeft, styLeft, false, right);
+                    TokenAST cast = new TokenAST(right.token, this, TokenASTType.Cast_Float, styLeft, styLeft, false, right);
                     right = cast;
                     return true;
                 }
@@ -837,7 +1000,7 @@ namespace PxPre.SynthSyn
             {
                 if (styLeft.typeName == "double")
                 {
-                    TokenAST cast = new TokenAST(right.token, TokenASTType.Cast_Double, styLeft, styLeft, false, right);
+                    TokenAST cast = new TokenAST(right.token, this, TokenASTType.Cast_Double, styLeft, styLeft, false, right);
                     right = cast;
                     return true;
                 }
@@ -849,7 +1012,7 @@ namespace PxPre.SynthSyn
             {
                 if (GetIntrinsicByteSizeFromName(styLeft.typeName) > GetIntrinsicByteSizeFromName(right.evaluatingType.typeName))
                 {
-                    TokenAST cast = new TokenAST(right.token, GetCastInstrinsicType(styLeft.typeName), styLeft, styLeft, false, right);
+                    TokenAST cast = new TokenAST(right.token, this, GetCastInstrinsicType(styLeft.typeName), styLeft, styLeft, false, right);
                     right = cast;
                 }
             }
@@ -944,6 +1107,7 @@ namespace PxPre.SynthSyn
 
         public void BuildBSFunction( SynthFuncDecl fnd, TokenAST ast, WASMBuild wasmBuild, SynthContextBuilder ctxBuilder, List<byte> fnbc)
         { 
+
             foreach(TokenAST n in ast.branches)
             { 
                 this.BuildBSFunctionExpression(fnd, n, wasmBuild, ctxBuilder, fnbc);
@@ -955,7 +1119,35 @@ namespace PxPre.SynthSyn
             switch(expr.astType)
             {
                 case TokenASTType.SetValue:
-                    break;
+                    { 
+                        if(expr.branches.Count != 2)
+                            throw new SynthExceptionCompile("Setting a value expected two parameters, a target and a destination.");
+
+                        ValueRef vrLeft = this.BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnbc);
+
+                        if(vrLeft.valLoc == ValueLoc.AddrLocal)
+                        { 
+                            ValueRef vrRight = this.BuildBSFunctionExpression(fnd, expr.branches[1], wasmBuild, ctxBuilder, fnbc);
+
+                            if(vrRight.valLoc == ValueLoc.AddrLocal)
+                            {
+                                fnbc.Add((byte)WASM.Instruction.local_get);
+                                fnbc.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)vrRight.idx));
+                            }
+                            else if(vrRight.valLoc == ValueLoc.ValueOnStack)
+                            { } // Already on stack
+                            else
+                                throw new SynthExceptionCompile($"Setting from RValue source {vrRight.valLoc} currently not supported.");
+
+                            
+                            fnbc.Add((byte)WASM.Instruction.local_set);
+                            fnbc.AddRange(WASM.BinParse.EncodeSignedLEB((uint)vrLeft.idx));
+
+                            return new ValueRef(ValueLoc.NoValue, -1, -1, vrLeft.varType);
+                        }
+                        else
+                            throw new SynthExceptionCompile("Setting non-local variables currently not supported.");
+                    }
 
                 case TokenASTType.GetGlobalVar:
                     break;
@@ -964,7 +1156,23 @@ namespace PxPre.SynthSyn
                     break;
 
                 case TokenASTType.GetLocalVar:
-                    break;
+                    { 
+                        ValueRef vr = this.GetLocalVariable(expr.token.fragment);
+
+                        if(vr == null)
+                            throw new SynthExceptionImpossible("Expected local variable wasn't found.");
+
+                        if(vr.varType.intrinsic == false)
+                            throw new SynthExceptionCompile("Non intrinsic local variables not supported yet.");
+
+                        if (vr.valLoc == ValueLoc.ValueOnMem || vr.valLoc == ValueLoc.AddrOnMemStack || vr.valLoc == ValueLoc.AddrOnHeap)
+                            throw new SynthExceptionCompile("Mem stack and heap variables not supported yet.");
+                        
+                        fnbc.Add((byte)WASM.Instruction.local_get);
+                        fnbc.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)vr.idx));
+
+                        return vr;
+                    }
 
                 case TokenASTType.GetParamVar:
                     break;
@@ -1065,7 +1273,7 @@ namespace PxPre.SynthSyn
                                 throw new SynthExceptionImpossible($"AST Unknown add type {left.evaluatingType.typeName}");
                         }
                         ctxBuilder.PushType(left.evaluatingType);
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, left.evaluatingType);
+                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, left.evaluatingType);
                     }
 
                 case TokenASTType.Sub:
@@ -1106,10 +1314,10 @@ namespace PxPre.SynthSyn
                                 break;
 
                             default:
-                                throw new SynthExceptionImpossible($"AST Unknown add type {left.evaluatingType.typeName}");
+                                throw new SynthExceptionImpossible($"AST Unknown sub type {left.evaluatingType.typeName}");
                         }
                         ctxBuilder.PushType(left.evaluatingType);
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, left.evaluatingType);
+                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, left.evaluatingType);
                     }
 
                 case TokenASTType.Mul:
@@ -1150,18 +1358,109 @@ namespace PxPre.SynthSyn
                                 break;
 
                             default:
-                                throw new SynthExceptionImpossible($"AST Unknown add type {left.evaluatingType.typeName}");
+                                throw new SynthExceptionImpossible($"AST Unknown mul type {left.evaluatingType.typeName}");
                         }
                         ctxBuilder.PushType(left.evaluatingType);
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, left.evaluatingType);
+                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, left.evaluatingType);
                     }
-                    break;
 
                 case TokenASTType.Div:
-                    break;
+                    {
+                        TokenAST left = expr.branches[0];
+                        TokenAST right = expr.branches[1];
+
+                        // TODO: If these are addresses, get the address
+                        ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnbc);
+                        ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnbc);
+
+                        ctxBuilder.PopType(left.evaluatingType);
+                        ctxBuilder.PopType(right.evaluatingType);
+                        switch (left.evaluatingType.typeName)
+                        {
+                            case "int8":
+                            case "int":
+                            case "int16":
+                                fnbc.Add((byte)WASM.Instruction.i32_div_s);
+                                break;
+
+                            case "uint8":
+                            case "uint16":
+                            case "uint":
+                                fnbc.Add((byte)WASM.Instruction.i32_div_u);
+                                break;
+
+                            case "int64":
+                                fnbc.Add((byte)WASM.Instruction.i64_div_s);
+                                break;
+
+                            case "uint64":
+                                fnbc.Add((byte)WASM.Instruction.i64_div_u);
+                                break;
+
+                            case "float":
+                                fnbc.Add((byte)WASM.Instruction.f32_div);
+                                break;
+
+                            case "float64":
+                                fnbc.Add((byte)WASM.Instruction.f64_div);
+                                break;
+
+                            default:
+                                throw new SynthExceptionImpossible($"AST Unknown div type {left.evaluatingType.typeName}");
+                        }
+                        ctxBuilder.PushType(left.evaluatingType);
+                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, left.evaluatingType);
+                    }
 
                 case TokenASTType.Mod:
-                    break;
+                    {
+                        TokenAST left = expr.branches[0];
+                        TokenAST right = expr.branches[1];
+
+                        // TODO: If these are addresses, get the address
+                        ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnbc);
+                        ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnbc);
+
+                        ctxBuilder.PopType(left.evaluatingType);
+                        ctxBuilder.PopType(right.evaluatingType);
+                        switch (left.evaluatingType.typeName)
+                        {
+                            case "int8":
+                            case "int":
+                            case "int16":
+                                fnbc.Add((byte)WASM.Instruction.i32_rem_s);
+                                break;
+
+                            case "uint8":
+                            case "uint16":
+                            case "uint":
+                                fnbc.Add((byte)WASM.Instruction.i32_rem_u);
+                                break;
+
+                            case "int64":
+                                fnbc.Add((byte)WASM.Instruction.i64_rem_s);
+                                break;
+
+                            case "uint64":
+                                fnbc.Add((byte)WASM.Instruction.i64_rem_u);
+                                break;
+
+                            case "float":
+                                throw new SynthExceptionSyntax(expr.token, "Floating point modulus not currently supported.");
+                                //fnbc.Add((byte)WASM.Instruction.f32_div);
+                                //break;
+
+                            case "float64":
+                                throw new SynthExceptionSyntax(expr.token, "Double floating point modulus not currently supported.");
+                                //fnbc.Add((byte)WASM.Instruction.f64_);
+                                //break;
+
+                            default:
+                                throw new SynthExceptionImpossible($"AST Unknown div type {left.evaluatingType.typeName}");
+                        }
+                        ctxBuilder.PushType(left.evaluatingType);
+                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, left.evaluatingType);
+                    }
 
                 case TokenASTType.BitOr:
                     break;
@@ -1181,11 +1480,29 @@ namespace PxPre.SynthSyn
                 case TokenASTType.BitShiftR:
                     break;
 
-                case TokenASTType.Unprocessed:
+                case TokenASTType.Unprocessed: 
                     break;
 
-                case TokenASTType.RegisterVar:
-                    break;
+                case TokenASTType.RegisterLocalVar:
+                    // The language doesn't return any kind of value for registering a local.
+                    {
+                        ValueRef vrReg = this.GetLocalVariable(expr.branches[0].token.fragment);
+
+                        // The first branch is the variable name, the second is 
+                        // an initialization
+                        if (expr.branches.Count > 1) 
+                        {
+
+                            // This will put/calculate the evaluated intrinsic value on the stack.
+                            ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[1], wasmBuild, ctxBuilder, fnbc);
+                            if(vr.varType.intrinsic == false)
+                                throw new SynthExceptionCompile("Initializing non-intrinsic variables on the stack is currently not supported.");
+
+                            fnbc.Add((byte)WASM.Instruction.local_set);
+                            fnbc.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)vrReg.idx));
+                        }
+                        return new ValueRef(ValueLoc.NoValue, 0, 0, vrReg.varType);
+                    }
 
                 case TokenASTType.DeclBool:
                     {
@@ -1196,7 +1513,7 @@ namespace PxPre.SynthSyn
                             fnbc.Add(1);
 
                         ctxBuilder.PushType(expr.evaluatingType);
-                        return new ValueRef( ValueLoc.ValueOnStack, 0, expr.evaluatingType);
+                        return new ValueRef( ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.DeclUInt:
@@ -1207,7 +1524,7 @@ namespace PxPre.SynthSyn
                         // signed
                         fnbc.AddRange(WASM.BinParse.EncodeSignedLEB((int)val));
                         ctxBuilder.PushType(expr.evaluatingType);
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, expr.evaluatingType);
+                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.DeclSInt:
@@ -1216,7 +1533,7 @@ namespace PxPre.SynthSyn
                         int val = int.Parse(expr.token.fragment);
                         ctxBuilder.PushType(expr.evaluatingType);
                         fnbc.AddRange(WASM.BinParse.EncodeSignedLEB(val));
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, expr.evaluatingType);
+                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.DeclUInt64:
@@ -1225,7 +1542,7 @@ namespace PxPre.SynthSyn
                         ulong val = ulong.Parse(expr.token.fragment);
                         fnbc.AddRange(WASM.BinParse.EncodeSignedLEB((long)val));
                         ctxBuilder.PushType(expr.evaluatingType);
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, expr.evaluatingType);
+                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.DeclSInt64:
@@ -1234,7 +1551,7 @@ namespace PxPre.SynthSyn
                         long val = long.Parse(expr.token.fragment);
                         fnbc.AddRange(WASM.BinParse.EncodeSignedLEB(val));
                         ctxBuilder.PushType(expr.evaluatingType);
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, expr.evaluatingType);
+                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.DeclFloat:
@@ -1243,7 +1560,7 @@ namespace PxPre.SynthSyn
                         float val = float.Parse(expr.token.fragment);
                         fnbc.AddRange(System.BitConverter.GetBytes(val));
                         ctxBuilder.PushType(expr.evaluatingType);
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, expr.evaluatingType);
+                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.DeclFloat64:
@@ -1252,7 +1569,7 @@ namespace PxPre.SynthSyn
                         double val = double.Parse(expr.token.fragment);
                         fnbc.AddRange(System.BitConverter.GetBytes(val));
                         ctxBuilder.PushType(expr.evaluatingType);
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, expr.evaluatingType);
+                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.DeclString:
@@ -1265,28 +1582,28 @@ namespace PxPre.SynthSyn
                     {
                         ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnbc);
                         fnbc.Add((byte)WASM.Instruction.f32_convert_i32_u);
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, expr.evaluatingType);
+                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.UIntToDouble:
                     {
                         ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnbc);
                         fnbc.Add((byte)WASM.Instruction.f64_convert_i32_u);
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, expr.evaluatingType);
+                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.UIntToUInt64:
                     {
                         ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnbc);
                         fnbc.Add((byte)WASM.Instruction.i64_extend_i32_u);
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, expr.evaluatingType);
+                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.SIntToSInt64:
                     {
                         ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnbc);
                         fnbc.Add((byte)WASM.Instruction.i64_extend_i32_s);
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, expr.evaluatingType);
+                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.FloatToUInt:
@@ -1295,7 +1612,7 @@ namespace PxPre.SynthSyn
                         ctxBuilder.PopType(expr.branches[0].evaluatingType);
                         ctxBuilder.PushType(expr.evaluatingType);
                         fnbc.Add((byte)WASM.Instruction.i32_trunc_f32_u);
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, expr.evaluatingType);
+                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.FloatToSInt:
@@ -1404,11 +1721,11 @@ namespace PxPre.SynthSyn
                         // TODO: Figure out where return value (if any) is and
                         // place it in the return value.
                         if(fn.returnType == null)
-                            return new ValueRef(ValueLoc.NoValue, 0, null);
+                            return new ValueRef(ValueLoc.NoValue, 0, 0, null);
                         else if(fn.returnType.intrinsic == true)
-                            return new ValueRef( ValueLoc.ValueOnStack, 0, fn.returnType);
+                            return new ValueRef( ValueLoc.ValueOnStack, 0, 0, fn.returnType);
                         else
-                            return new ValueRef(ValueLoc.ValueOnMem, 0, fn.returnType);
+                            return new ValueRef(ValueLoc.ValueOnMem, 0, 0, fn.returnType);
                     }
 
                 case TokenASTType.DefaultParam:

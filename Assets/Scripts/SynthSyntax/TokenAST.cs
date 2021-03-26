@@ -12,6 +12,7 @@ namespace PxPre.SynthSyn
         public Token token;
         public TokenASTType astType;
         public List<TokenAST> branches;
+        public SynthContextBuilder builder;
 
         public void SetBranches(params TokenAST [] tas)
         { 
@@ -19,8 +20,9 @@ namespace PxPre.SynthSyn
             this.branches.AddRange(tas);
         }
 
-        public TokenAST(Token t, TokenASTType ast, SynthObj so, SynthType sevty, bool hasAddress, params TokenAST [] branches)
+        public TokenAST(Token t, SynthContextBuilder builder, TokenASTType ast, SynthObj so, SynthType sevty, bool hasAddress, params TokenAST [] branches)
         { 
+            this.builder        = builder;
             this.synthObj       = so;
             this.evaluatingType = sevty;
             this.token          = t;
@@ -37,6 +39,7 @@ namespace PxPre.SynthSyn
             TokenAST ret = 
                 new TokenAST(
                     this.token, 
+                    this.builder,
                     this.astType, 
                     this.synthObj, 
                     this.evaluatingType, 

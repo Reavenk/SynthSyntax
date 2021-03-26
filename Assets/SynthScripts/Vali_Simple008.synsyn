@@ -4,7 +4,7 @@
 //parenthesis is exagerated.
 //
 // >> Name: "Isolated Paren"
-// >> Results {288}
+// >> Results: {288}
 //
 
 extern void LogTest(int loggedVal);

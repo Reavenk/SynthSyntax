@@ -1,7 +1,7 @@
 // Test the __LINE__ macro.
 //
 // >> Name: Line Macro
-// >> Results {12, 13, 14, 15, 16, 144}
+// >> Results: {12, 13, 14, 15, 144}
 //
 
 extern void LogTest(int loggedVal);

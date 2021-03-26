@@ -77,8 +77,6 @@ namespace PxPre.SynthSyn
         /// </summary>
         public bool isExtern = false;
 
-        public SynthContextBuilder build = new SynthContextBuilder();
-
         // TODO: Reorganize correctly (refactor)
         // Cached WASM types on the stack. This should map 1-to-1 with the stack variable listing
         public List<WASM.Bin.TypeID> localTypes = new List<WASM.Bin.TypeID>();
@@ -528,9 +526,10 @@ namespace PxPre.SynthSyn
             return retSelf;
         }
 
-        public SynthContextBuilder Build(WASMBuild build, SynthContextBuilder parentContext)
+        // TODO: Perhaps this function should be moved into WASMBuild?
+        public SynthContextBuilder Build(WASMBuild build)
         {
-            SynthContextBuilder builder = new SynthContextBuilder();
+            SynthContextBuilder builder = new SynthContextBuilder(null);
 
             if(this.ast != null)
                 throw new SynthExceptionImpossible($"Attempting to build function {this.functionName} AST multiple times.");
@@ -539,16 +538,18 @@ namespace PxPre.SynthSyn
 
             // NOTE: For now functions are non-typed (in the SynthSyn language) and 
             // are non addressable.
-            this.ast = new TokenAST(this.declPhrase[0], TokenASTType.FunctionDecl, this, null, false);
+            this.ast = new TokenAST(this.declPhrase[0], builder, TokenASTType.FunctionDecl, this, null, false);
 
             SynthLog.Log("Building function AST.");
 
-            List<byte> fnBCBytes = new List<byte>();
+            List<SynthContextBuilder> builders = new List<SynthContextBuilder>();
+            builders.Add(builder);
+
             //List<TokenTree> treeLines = new List<TokenTree>();
             for(int i = 0; i < executingLines.Count; ++i)
             { 
                 List<Token> execLine = executingLines[i];
-                TokenTree rootLineNode = TokenTree.EatTokensIntoTree(execLine);
+                TokenTree rootLineNode = TokenTree.EatTokensIntoTree(execLine, this, true);
                 //treeLines.Add(rootLineNode);
 
                 // If it's a member function (not a static function) then full in the struct
@@ -559,7 +560,7 @@ namespace PxPre.SynthSyn
                 if(this.isStatic == false)
                     invokingScope = this.GetStructScope();
 
-                TokenAST exprAST = builder.ProcessFunctionExpression(build, invokingScope, this, rootLineNode);
+                TokenAST exprAST = builder.ProcessFunctionExpression(builders, build, invokingScope, this, rootLineNode);
                 if(exprAST == null)
                 { 
                     // We shouldn't have received null, we should have thrown before this
@@ -573,7 +574,83 @@ namespace PxPre.SynthSyn
             SynthLog.Log("Finished building AST.");
             SynthLog.Log("Converting AST to binary WASM.");
 
-            builder.BuildBSFunction(this, this.ast, build, parentContext, fnBCBytes);
+            // Before the AST is turned into actual WASM binary, we need to finalize the
+            // byte alignment and the indices of local stack variables. This is done with
+            // CompileAlignment, who's lower scopes should appear earlier in the builders
+            // list before higher children scopes.
+            foreach(SynthContextBuilder b in builders)
+                b.CompileAlignment();
+
+            // Gather all the local variables and declare them. This isn't as efficient as things
+            // could be because after variables go out of scope, their positions on the stack
+            // can be reused if they match types we encounter in the future, but that can be 
+            // handled later.
+
+            // The program binary
+            List<byte> fnBCBytes = new List<byte>();
+
+            // Gather all the local variables
+            List<WASM.Bin.TypeID> localVarTys = new List<WASM.Bin.TypeID>();
+            foreach(SynthContextBuilder b in builders)
+            { 
+                foreach(SynthContextBuilder.ValueRef stkVal in b.locStkEle)
+                {
+                    if(stkVal.varType.intrinsic == false)
+                        throw new SynthExceptionCompile(""); // TODO: Error msg
+
+                    switch(stkVal.varType.typeName)
+                    { 
+                        case "bool":
+                        case "int8":
+                        case "uint8":
+                        case "int16":
+                        case "uint16":
+                        case "int":
+                        case "int32":
+                            localVarTys.Add( WASM.Bin.TypeID.Int32);
+                            break;
+
+                        case "int64":
+                        case "uint64":
+                            localVarTys.Add(WASM.Bin.TypeID.Int64);
+                            break;
+
+                        case "float":
+                            localVarTys.Add(WASM.Bin.TypeID.Float32);
+                            break;
+
+                        case "double":
+                            localVarTys.Add(WASM.Bin.TypeID.Float64);
+                            break;
+                    }
+                }
+            }
+
+            List<KeyValuePair< WASM.Bin.TypeID, int>> consolidatedLocalTys = new List<KeyValuePair<WASM.Bin.TypeID, int>>();
+            for (int i = 0; i < localVarTys.Count; ++i)
+            {
+                WASM.Bin.TypeID tyid = localVarTys[i];
+                int ct = 1;
+                ++i;
+
+                for(; i < localVarTys.Count; ++i)
+                { 
+                    if(localVarTys[i] != tyid)
+                        break;
+
+                    ++ct;
+                }
+                consolidatedLocalTys.Add(new KeyValuePair<WASM.Bin.TypeID, int>(tyid, ct));
+            }
+
+            fnBCBytes.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)consolidatedLocalTys.Count)); // Local decl
+            for(int i = 0; i < consolidatedLocalTys.Count; ++i)
+            {
+                fnBCBytes.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)consolidatedLocalTys[i].Value));
+                fnBCBytes.AddRange(WASM.BinParse.EncodeUnsignedLEB((byte)consolidatedLocalTys[i].Key));
+            }
+
+            builder.BuildBSFunction(this, this.ast, build, builder, fnBCBytes);
             fnBCBytes.Add( (byte)WASM.Instruction.end);
             this.fnBin = fnBCBytes.ToArray();
 

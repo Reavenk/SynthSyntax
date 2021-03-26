@@ -1,7 +1,7 @@
 // Tests having a local integer variable in a function.
 //
 // >> Name: Local Int Var
-// >> Results {7}
+// >> Results: {7}
 //
 
 extern void LogTest(int loggedVal);
@@ -9,7 +9,7 @@ extern void EndTest();
 
 entry DoTest()
 {
-	int a = 7
+	int a = 7;
 	LogTest(a);
 	EndTest();
 	

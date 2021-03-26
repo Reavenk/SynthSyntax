@@ -52,10 +52,13 @@ namespace PxPre.SynthSyn
 
         Unprocessed,
 
-        RegisterVar,
+        RegisterLocalVar,
+        RegisterLocalVarName,
+        RegisterLocalVarInit,
 
         // Declare type values - note this isn't the same
-        // as declaring variables of these types.
+        // as declaring variables of these types (that would be
+        // RegisterLocalVar).
         DeclBool,
         DeclUInt,
         DeclSInt,

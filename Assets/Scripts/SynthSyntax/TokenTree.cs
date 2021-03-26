@@ -13,6 +13,11 @@ namespace PxPre.SynthSyn
         public TokenType _tokenType { get => this.root.type; }
         public string _fragment { get => this.root.fragment; }
 
+        // TODO: These should no doubt be turned into enums,
+        // the game goes for the "keyword" string member.
+        const string keyCast = "cast";
+        const string keyVarDecl = "vardecl";
+
         /// <summary>
         /// The token the tree was created from. 
         /// 
@@ -38,7 +43,7 @@ namespace PxPre.SynthSyn
             this.keyword = keyword;
         }
 
-        public static TokenTree EatTokensIntoTree(List<Token> tokens)
+        public static TokenTree EatTokensIntoTree(List<Token> tokens, SynthScope scope, bool rootExpression)
         {
             // When we start processing the tokens here, these are already
             // single-line expressions that have been separated by semicolons.
@@ -51,6 +56,37 @@ namespace PxPre.SynthSyn
 
             if(tokens.Count == 0)
                 throw new SynthExceptionImpossible("Attempting to process tokens collection of size 0.");
+
+            if(rootExpression == true)
+            { 
+                // Is a local variable being declared?
+                if(tokens[0].Matches(TokenType.tyWord) == true)
+                { 
+                    SynthType sty = scope.GetType(tokens[0].fragment);
+                    if(sty != null)
+                    { 
+                        TokenTree ttVarDecl = new TokenTree(keyVarDecl);
+                        ttVarDecl.root = tokens[0];
+
+                        TokenTree ttName = new TokenTree("varname");
+                        ttName.root = tokens[1];
+
+                        ttVarDecl.nodes.Add(ttName);
+
+                        if(tokens.Count > 2)
+                        { 
+                            
+                            if(tokens.Count < 4 || tokens[2].MatchesSymbol("=") == false)
+                                throw new SynthExceptionSyntax(tokens[2], "Invalid syntax for declaring local variable.");
+
+                            List<Token> setExpr = tokens.GetRange(3, tokens.Count - 3);
+                            ttVarDecl.nodes.Add(EatTokensIntoTree(setExpr, scope, false));
+
+                            return ttVarDecl;
+                        }
+                    }
+                }
+            }
 
             if(tokens[0].Matches(TokenType.tyWord, "for") == true)
             { 
@@ -81,11 +117,11 @@ namespace PxPre.SynthSyn
                     throw new SynthExceptionSyntax(orderTokens[0], "Unknown content in for loop.");
 
                 TokenTree nodeOrder = new TokenTree("order");
-                nodeOrder.nodes.Add(EatTokensIntoTree(initTokens));
-                nodeOrder.nodes.Add(EatTokensIntoTree(predTokens));
-                nodeOrder.nodes.Add(EatTokensIntoTree(incrTokens));
+                nodeOrder.nodes.Add(EatTokensIntoTree(initTokens, scope, false));
+                nodeOrder.nodes.Add(EatTokensIntoTree(predTokens, scope, false));
+                nodeOrder.nodes.Add(EatTokensIntoTree(incrTokens, scope, false));
 
-                TokenTree nodeBody = ConsumeBody(tokens, endPredicate);
+                TokenTree nodeBody = ConsumeBody(tokens, endPredicate, scope);
 
                 TokenTree ret = new TokenTree("for");
                 ret.root = tokens[0];
@@ -104,11 +140,11 @@ namespace PxPre.SynthSyn
                 Parser.MovePastParenScope(ref endPredicate, tokens);
 
                 List<Token> predToks = tokens.GetRange(2, endPredicate - 3);
-                TokenTree nodeBody = ConsumeBody(tokens, endPredicate);
+                TokenTree nodeBody = ConsumeBody(tokens, endPredicate, scope);
 
                 TokenTree ret = new TokenTree("if");
                 ret.root = tokens[0];
-                ret.nodes.Add(EatTokensIntoTree(predToks));
+                ret.nodes.Add(EatTokensIntoTree(predToks, scope, false));
                 ret.nodes.Add(nodeBody);
                 return ret;
             }
@@ -122,11 +158,11 @@ namespace PxPre.SynthSyn
                 Parser.MovePastParenScope(ref endPredicate, tokens);
 
                 List<Token> predToks = tokens.GetRange(2, endPredicate - 3);
-                TokenTree nodeBody = ConsumeBody(tokens, endPredicate);
+                TokenTree nodeBody = ConsumeBody(tokens, endPredicate, scope);
 
                 TokenTree ret = new TokenTree("while");
                 ret.root = tokens[0];
-                ret.nodes.Add(EatTokensIntoTree(predToks));
+                ret.nodes.Add(EatTokensIntoTree(predToks, scope, false));
                 ret.nodes.Add(nodeBody);
 
                 return ret;
@@ -152,11 +188,11 @@ namespace PxPre.SynthSyn
                 int parenEnd = parenStart;
                 Parser.MovePastParenScope(ref parenEnd, tokens);
                 List<Token> predTokens = tokens.GetRange(parenStart, parenEnd - parenStart);
-                TokenTree nodeBody = ConsumeBody(tokens, 1);
+                TokenTree nodeBody = ConsumeBody(tokens, 1, scope);
 
                 TokenTree ret = new TokenTree("dowhile");
                 ret.root = tokens[0];
-                ret.nodes.Add(EatTokensIntoTree(predTokens));
+                ret.nodes.Add(EatTokensIntoTree(predTokens, scope, false));
                 ret.nodes.Add(nodeBody);
 
                 return ret;
@@ -241,10 +277,10 @@ namespace PxPre.SynthSyn
                 }
             }
 
-            return ConsolidateTokenTree(nodes);
+            return ConsolidateTokenTree(nodes, scope, false);
         }
 
-        public static TokenTree ConsumeBody(List<Token> tokens, int bodyStart)
+        public static TokenTree ConsumeBody(List<Token> tokens, int bodyStart, SynthScope scope)
         { 
             TokenTree ret = new TokenTree("body");
 
@@ -259,7 +295,7 @@ namespace PxPre.SynthSyn
 
                     List<Token> phrase = tokens.GetRange(0, endBody);
                     tokens.RemoveRange(0, endBody);
-                    ret.nodes.Add(EatTokensIntoTree(phrase));
+                    ret.nodes.Add(EatTokensIntoTree(phrase, scope, false));
                 }
             }
             else
@@ -271,13 +307,13 @@ namespace PxPre.SynthSyn
                     throw new SynthExceptionSyntax(tokens[0], "Invalid for loop body.");
 
                 List<Token> body = tokens.GetRange(2, tokens.Count - 2);
-                ret.nodes.Add(EatTokensIntoTree(body));
+                ret.nodes.Add(EatTokensIntoTree(body, scope, false));
             }
 
             return ret;
         }
 
-        public static TokenTree ConsolidateTokenTree(List<TokenTree> nodes, bool foundEquals = false)
+        public static TokenTree ConsolidateTokenTree(List<TokenTree> nodes, SynthScope scope, bool rootExpression)
         { 
             while (nodes.Count > 0)
             { 
@@ -319,7 +355,7 @@ namespace PxPre.SynthSyn
                     nodes[i].root.Matches(TokenType.tySymbol, ">>=" ) == true ||
                     nodes[i].root.Matches(TokenType.tySymbol, "<<=" ) == true )
                 {
-                    return CreatePivot(nodes, i, true);
+                    return CreatePivot(nodes, i, scope, false);
                 }
             }
 
@@ -342,7 +378,7 @@ namespace PxPre.SynthSyn
                     nodes[i].root.Matches(TokenType.tySymbol, "<" ) == true ||
                     nodes[i].root.Matches(TokenType.tySymbol, "<=") == true)
                 {
-                    return CreatePivot(nodes, i, foundEquals);
+                    return CreatePivot(nodes, i, scope, false);
                 }
             }
 
@@ -352,7 +388,7 @@ namespace PxPre.SynthSyn
                     nodes[i].root.Matches(TokenType.tySymbol, "+") == true ||
                     nodes[i].root.Matches(TokenType.tySymbol, "-") == true)
                 {
-                    return CreatePivot(nodes, i, foundEquals);
+                    return CreatePivot(nodes, i, scope, false);
                 }
             }
 
@@ -360,18 +396,10 @@ namespace PxPre.SynthSyn
             { 
                 if(
                     nodes[i].root.Matches(TokenType.tySymbol, "*") == true ||
-                    nodes[i].root.Matches(TokenType.tySymbol, "/") == true )
+                    nodes[i].root.Matches(TokenType.tySymbol, "/") == true ||
+                    nodes[i].root.Matches(TokenType.tySymbol, "%") == true)
                 {
-                    return CreatePivot(nodes, i, foundEquals);
-                }
-            }
-
-            for (int i = nodes.Count - 1; i >= 0; --i)
-            {
-                if (
-                    nodes[i].root.Matches(TokenType.tySymbol, "*") == true)
-                {
-                    return CreatePivot(nodes, i, foundEquals);
+                    return CreatePivot(nodes, i, scope, false);
                 }
             }
 
@@ -385,7 +413,7 @@ namespace PxPre.SynthSyn
                     nodes[i].root.Matches(TokenType.tySymbol, "^") == true ||
                     nodes[i].root.Matches(TokenType.tySymbol, "~") == true)
                 {
-                    return CreatePivot(nodes, i, foundEquals);
+                    return CreatePivot(nodes, i, scope, false);
                 }
             }
 
@@ -403,7 +431,7 @@ namespace PxPre.SynthSyn
                 }
                 // A nested expression (including what could still be a cast)
                 if(retParen == null) 
-                    retParen = EatTokensIntoTree(nodes[0].toksToProcess);
+                    retParen = EatTokensIntoTree(nodes[0].toksToProcess, scope, false);
 
                 // if the entire phrase is inside a parenthesis, relay it back.
                 if(nodes.Count == 1)
@@ -413,7 +441,7 @@ namespace PxPre.SynthSyn
                     throw new SynthExceptionSyntax(nodes[0].root, "Expected a cast, but did not find any expression to cast.");
 
                 List<TokenTree> castedExpr = nodes.GetRange(1, nodes.Count - 1);
-                TokenTree castedTree = ConsolidateTokenTree(castedExpr, true);
+                TokenTree castedTree = ConsolidateTokenTree(castedExpr, scope, false);
                 retParen.nodes.Add(castedTree);
 
                 return retParen;
@@ -432,7 +460,7 @@ namespace PxPre.SynthSyn
                 
                 if (nodes[i].root.Matches(TokenType.tySymbol, ".") == true)
                 {
-                    return CreatePivot(nodes, i, foundEquals);
+                    return CreatePivot(nodes, i, scope, false);
                 }
                 else if (nodes[i].root.MatchesSymbol("(") == true)
                 { 
@@ -445,13 +473,13 @@ namespace PxPre.SynthSyn
                     { 
                         int iter = 0;
                         Parser.MovePastScopeTComma(ref iter, parenToks);
-                        nodes[i].nodes.Add(EatTokensIntoTree(parenToks.GetRange(0, iter)));
+                        nodes[i].nodes.Add(EatTokensIntoTree(parenToks.GetRange(0, iter), scope, false));
                         parenToks.RemoveRange(0, iter);
                     }
 
                     List<TokenTree> pre = nodes.GetRange(0, i);
                     nodeIdx.nodes.Add(nodes[i]);
-                    nodeIdx.nodes.Add(ConsolidateTokenTree(pre, true));
+                    nodeIdx.nodes.Add(ConsolidateTokenTree(pre, scope, false));
 
                     return nodeIdx;
 
@@ -466,11 +494,11 @@ namespace PxPre.SynthSyn
                     // The parsed token in the same.
                     nodeIdx.root = nodes[i].root;
                     // Break down the original's children as roots
-                    nodes[i].nodes.Add(ConsumeBody(nodes[i].toksToProcess, 0));
+                    nodes[i].nodes.Add(ConsumeBody(nodes[i].toksToProcess, 0, scope));
                     // Everything that builds up the thing to index is built as a recursive call.
                     
                     List<TokenTree> pre = nodes.GetRange(0, i);
-                    nodeIdx.nodes.Add(ConsolidateTokenTree(pre, true));
+                    nodeIdx.nodes.Add(ConsolidateTokenTree(pre, scope, false));
 
                     return nodeIdx;
                 }
@@ -479,13 +507,13 @@ namespace PxPre.SynthSyn
             throw new SynthExceptionSyntax(nodes[0].root, "Unknown syntax.");
         }
 
-        public static TokenTree CreatePivot(List<TokenTree> nodes, int idx, bool foundEquals)
+        public static TokenTree CreatePivot(List<TokenTree> nodes, int idx, SynthScope scope, bool rootExpression)
         {
             ThrowIfAtEdge(nodes, idx);
 
             TokenTree ret = nodes[idx];
-            ret.nodes.Add(ConsolidateTokenTree(nodes.GetRange(0, idx), foundEquals));
-            ret.nodes.Add(ConsolidateTokenTree(nodes.GetRange(idx + 1, nodes.Count - idx - 1), foundEquals));
+            ret.nodes.Add(ConsolidateTokenTree(nodes.GetRange(0, idx), scope, false));
+            ret.nodes.Add(ConsolidateTokenTree(nodes.GetRange(idx + 1, nodes.Count - idx - 1), scope, false));
 
             return ret;
 

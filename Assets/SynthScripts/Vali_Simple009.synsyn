@@ -1,7 +1,7 @@
 // Testing basic arithemetic operations.
 //
 // >> Name: 
-// >> Results {132}
+// >> Results: {132, 2}
 //
 
 extern void LogTest(int loggedVal);
