@@ -403,21 +403,46 @@ namespace PxPre.SynthSyn
                 }
             }
 
-            
-
             for (int i = nodes.Count - 1; i >= 0; --i)
             {
                 if (
                     nodes[i].root.Matches(TokenType.tySymbol, "&") == true ||
                     nodes[i].root.Matches(TokenType.tySymbol, "|") == true ||
-                    nodes[i].root.Matches(TokenType.tySymbol, "^") == true ||
-                    nodes[i].root.Matches(TokenType.tySymbol, "~") == true)
+                    nodes[i].root.Matches(TokenType.tySymbol, "^") == true)
                 {
                     return CreatePivot(nodes, i, scope, false);
                 }
             }
 
-            if(nodes[0].root.Matches(TokenType.tySymbol, "(") == true)
+            for (int i = nodes.Count - 1; i >= 0; --i)
+            {
+                if (
+                    nodes[i].root.Matches(TokenType.tySymbol, ">>") == true ||
+                    nodes[i].root.Matches(TokenType.tySymbol, "<<") == true)
+                {
+                    return CreatePivot(nodes, i, scope, false);
+                }
+            }
+
+            for (int i = nodes.Count - 1; i >= 0; --i)
+            {
+                if (nodes[i].root.Matches(TokenType.tySymbol, "~") == true)
+                {
+                    if(i != 0)
+                    { 
+                        // We can't actually do an inversion if it's the last item, but we search
+                        // that window just so we can scan for the error condition.
+                        throw new SynthExceptionSyntax(nodes[i].root, "~ found at invalid position.");
+                    }
+
+                    List<TokenTree> lst = nodes.GetRange(i + 1, nodes.Count - i - 1);
+                    TokenTree invTarg = ConsolidateTokenTree(lst, scope, false);
+                    nodes[i].nodes.Add(invTarg);
+                    return nodes[i];
+                }
+            }
+
+            if (nodes[0].root.Matches(TokenType.tySymbol, "(") == true)
             { 
                 TokenTree retParen = null;
                 if(nodes[0].toksToProcess.Count == 1)

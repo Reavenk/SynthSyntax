@@ -793,6 +793,26 @@ namespace PxPre.SynthSyn
                 return new TokenAST(node.root, this, TokenASTType.BitXor, null, left.evaluatingType, false, left, right);
             }
 
+            if( node.root.MatchesSymbol(">>") == true)
+            {
+                TokenAST left, right;
+                EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
+                EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
+                EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
+
+                return new TokenAST(node.root, this, TokenASTType.BitShiftR, null, left.evaluatingType, false, left, right);
+            }
+
+            if(node.root.MatchesSymbol("<<") == true)
+            {
+                TokenAST left, right;
+                EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
+                EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
+                EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
+
+                return new TokenAST(node.root, this, TokenASTType.BitShiftL, null, left.evaluatingType, false, left, right);
+            }
+
             if (node.root.MatchesSymbol("~") == true)
             {
                 if(node.nodes.Count != 1)
@@ -1114,6 +1134,8 @@ namespace PxPre.SynthSyn
             }
         }
 
+        static HashSet<string> match32 = new HashSet<string> { "int8", "uint8", "int16", "uint16", "int", "uint" };
+        static HashSet<string> match64 = new HashSet<string> { "int64", "uint64" };
         public ValueRef BuildBSFunctionExpression(SynthFuncDecl fnd, TokenAST expr, WASMBuild wasmBuild, SynthContextBuilder ctxBuilder, List<byte> fnbc)
         { 
             switch(expr.astType)
@@ -1463,22 +1485,188 @@ namespace PxPre.SynthSyn
                     }
 
                 case TokenASTType.BitOr:
-                    break;
-
                 case TokenASTType.BitAnd:
-                    break;
-
                 case TokenASTType.BitXor:
-                    break;
+                    {
+                        TokenAST left = expr.branches[0];
+                        TokenAST right = expr.branches[1];
+
+                        WASM.Instruction instr32;
+                        WASM.Instruction instr64;
+                        switch(expr.astType)
+                        { 
+                            case TokenASTType.BitOr:
+                                instr32 = WASM.Instruction.i32_or;
+                                instr64 = WASM.Instruction.i64_or;
+                                break;
+
+                            default:
+                            case TokenASTType.BitAnd:
+                                instr32 = WASM.Instruction.i32_and;
+                                instr64 = WASM.Instruction.i64_and;
+                                break;
+
+                            case TokenASTType.BitXor:
+                                instr32 = WASM.Instruction.i32_xor;
+                                instr64 = WASM.Instruction.i64_xor;
+                                break;
+                        }
+
+                        HashSet<string> match32 = new HashSet<string>{ "int8", "uint8", "int16", "uint16", "int", "uint"};
+                        HashSet<string> match64 = new HashSet<string>{ "int64", "uint64" };
+                        
+                        // It's uncertain how the autocasting should work
+                        if(
+                            match32.Contains(left.evaluatingType.typeName) == true && 
+                            match32.Contains(right.evaluatingType.typeName) == true)
+                        {
+                            ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnbc);
+                            ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnbc);
+
+                            fnbc.Add((byte)instr32);
+                            return new ValueRef(ValueLoc.ValueOnStack, -1, -1, fnd.GetType("int"));
+                        }
+                        else if(
+                            match64.Contains(left.evaluatingType.typeName) == true &&
+                            match64.Contains(right.evaluatingType.typeName) == true)
+                        {
+                            ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnbc);
+                            ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnbc);
+
+                            fnbc.Add((byte)instr64);
+                            return new ValueRef(ValueLoc.ValueOnStack, -1, -1, fnd.GetType("int64"));
+                        }
+                        else
+                        {
+                            throw new SynthExceptionSyntax(
+                                expr.token, 
+                                $"Cannot combine types {left.evaluatingType} and {right.evaluatingType} for a bit or operation.");
+                        }
+                    }
 
                 case TokenASTType.BitInv:
-                    break;
+                    {
+                        if(expr.branches.Count != 1)
+                            throw new SynthExceptionImpossible("Bit inv has an unexpected node count.");
+
+                        TokenAST astVal = expr.branches[0];
+
+                        // https://github.com/WebAssembly/design/issues/701
+                        if (match32.Contains(astVal.evaluatingType.typeName) == true)
+                        {
+                            ValueRef vrVal = BuildBSFunctionExpression(fnd, astVal, wasmBuild, ctxBuilder, fnbc);
+
+                            fnbc.Add((byte)WASM.Instruction.i32_const);
+                            fnbc.AddRange(WASM.BinParse.EncodeSignedLEB(-1));
+                            fnbc.Add((byte)WASM.Instruction.i32_xor);
+                        }
+                        else if(match64.Contains(astVal.evaluatingType.typeName) == true)
+                        {
+                            ValueRef vrVal = BuildBSFunctionExpression(fnd, astVal, wasmBuild, ctxBuilder, fnbc);
+
+                            fnbc.Add((byte)WASM.Instruction.i64_const);
+                            fnbc.AddRange(WASM.BinParse.EncodeSignedLEB((long)-1));
+                            fnbc.Add((byte)WASM.Instruction.i64_xor);
+                        }
+                        else
+                        {
+                            throw new SynthExceptionSyntax(
+                                expr.token, 
+                                $"Cannot invert bits of type {astVal.evaluatingType.typeName}.");
+                        }
+
+                        return new ValueRef(ValueLoc.ValueOnStack, -1, -1, astVal.evaluatingType);
+                    }
 
                 case TokenASTType.BitShiftL:
-                    break;
+                    {
+                        TokenAST left = expr.branches[0];
+                        TokenAST right = expr.branches[1];
+
+                        // It's uncertain how the autocasting should work
+                        if (
+                            match32.Contains(left.evaluatingType.typeName) == true &&
+                            match32.Contains(right.evaluatingType.typeName) == true)
+                        {
+                            ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnbc);
+                            ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnbc);
+
+                            fnbc.Add((byte)WASM.Instruction.i32_shl);
+                            return new ValueRef(ValueLoc.ValueOnStack, -1, -1, fnd.GetType("int"));
+                        }
+                        else if (
+                            match64.Contains(left.evaluatingType.typeName) == true &&
+                            match64.Contains(right.evaluatingType.typeName) == true)
+                        {
+                            ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnbc);
+                            ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnbc);
+
+                            fnbc.Add((byte)WASM.Instruction.i64_shl);
+                            return new ValueRef(ValueLoc.ValueOnStack, -1, -1, fnd.GetType("int64"));
+                        }
+                        else
+                        {
+                            throw new SynthExceptionSyntax(
+                                expr.token,
+                                $"Cannot combine types {left.evaluatingType} and {right.evaluatingType} for a bit shift operation.");
+                        }
+                    }
 
                 case TokenASTType.BitShiftR:
-                    break;
+                    {
+                        TokenAST left = expr.branches[0];
+                        TokenAST right = expr.branches[1];
+
+                        HashSet<string> match32 = new HashSet<string> { "int8", "uint8", "int16", "uint16", "int", "uint" };
+                        HashSet<string> match64 = new HashSet<string> { "int64", "uint64" };
+
+                        // It's uncertain how the autocasting should work
+                        if (
+                            match32.Contains(left.evaluatingType.typeName) == true &&
+                            match32.Contains(right.evaluatingType.typeName) == true)
+                        {
+                            ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnbc);
+                            ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnbc);
+
+                            // TODO: More work needs to be done to figure out casting of lower unsigned values
+                            switch(right.evaluatingType.typeName)
+                            { 
+                                case "int8":
+                                case "int16":
+                                case "int":
+                                    fnbc.Add((byte)WASM.Instruction.i32_shr_s);
+                                    break;
+
+                                case "uint8":
+                                case "uint16":
+                                case "uint":
+                                    fnbc.Add((byte)WASM.Instruction.i32_shr_u);
+                                    break;
+                            }
+
+                            return new ValueRef(ValueLoc.ValueOnStack, -1, -1, fnd.GetType("int"));
+                        }
+                        else if (
+                            match64.Contains(left.evaluatingType.typeName) == true &&
+                            match64.Contains(right.evaluatingType.typeName) == true)
+                        {
+                            ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnbc);
+                            ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnbc);
+
+                            if(right.evaluatingType.typeName == "int64")
+                                fnbc.Add((byte)WASM.Instruction.i64_shr_s);
+                            else if(right.evaluatingType.typeName == "uint64")
+                                fnbc.Add((byte)WASM.Instruction.i64_shr_u);
+
+                            return new ValueRef(ValueLoc.ValueOnStack, -1, -1, fnd.GetType("int64"));
+                        }
+                        else
+                        {
+                            throw new SynthExceptionSyntax(
+                                expr.token,
+                                $"Cannot combine types {left.evaluatingType} and {right.evaluatingType} for a bit shift operation.");
+                        }
+                    }
 
                 case TokenASTType.Unprocessed: 
                     break;

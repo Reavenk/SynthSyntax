@@ -1,0 +1,24 @@
+// A bare bones test for testing
+//	- basic compilation
+//	- ability for PxPreWASM to take in the output
+//	- PxPreWASM and SynthSyn function integration
+//	- SynthSyn unit testing functions LogTest and EndTest
+//
+// >> Name: "Basic"
+// >> Results: {0, 0, 1, 2, 7, 6}
+//
+
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	LogTest(0 & 1);
+	LogTest(1 & 2);
+	LogTest(1 & 3);
+	LogTest(2 & 3);
+	LogTest(7 & 7);
+	LogTest(7 & 6);
+	EndTest();
+}

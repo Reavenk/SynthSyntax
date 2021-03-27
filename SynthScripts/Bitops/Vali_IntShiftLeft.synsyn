@@ -1,0 +1,17 @@
+// Testing the left shift operator on integers.
+//
+// >> Name: "Left Shift"
+// >> Results: {1, 2, 96}
+//
+
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	LogTest(1 << 0);
+	LogTest(1 << 1);
+	LogTest(3 << 5);
+	EndTest();
+}

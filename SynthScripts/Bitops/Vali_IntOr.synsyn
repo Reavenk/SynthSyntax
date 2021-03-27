@@ -1,0 +1,19 @@
+// Testing the OR operator on integers.
+//
+// >> Name: "Int OR"
+// >> Results: {0, 1, 7, 192}
+//
+
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	LogTest(0|0);
+	LogTest(0|1);
+	LogTest(3 | 4);
+	LogTest(64 | 128);
+
+	EndTest();
+}

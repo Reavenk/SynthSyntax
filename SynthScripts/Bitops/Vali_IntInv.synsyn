@@ -1,0 +1,19 @@
+// Testing the bit inversion operator on integers.
+//
+// >> Name: "Integer Inverse"
+// >> Results: {-1, -51, -1048577, -200 }
+//
+
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	LogTest(~0);
+	LogTest(~50);
+	LogTest(~(1 << 20));
+	LogTest(~(7 | 196));
+
+	EndTest();
+}

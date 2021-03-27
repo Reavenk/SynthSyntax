@@ -1,0 +1,18 @@
+// Testing the right shift operator on integers.
+//
+// >> Name: "Right shift"
+// >> Results: {61, 8, 308641}
+//
+
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	LogTest(123 >> 1);
+	LogTest(64 >> 3);
+	LogTest(9876543 >> 5);
+
+	EndTest();
+}
