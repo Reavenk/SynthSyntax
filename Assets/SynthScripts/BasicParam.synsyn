@@ -1,5 +1,0 @@
-param int count = 5;
-param float 6 = 0;
-param string dothething = "done";
-param vec3f rotation;
-param vec3f position = vec3f(10.0f, 20.0f, 30.0f);
