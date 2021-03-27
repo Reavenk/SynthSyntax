@@ -77,8 +77,8 @@ public static class UnitTest_Utils
             Module mod = Module.LoadBinary(wasmBin);
             ExecutionContext exc = new ExecutionContext(mod, true);
 
-            UnitTest_Utils.SetupTestingContext(exc);
-            TestResults tr = UnitTest_Utils.StartTest();
+            SetupTestingContext(exc);
+            TestResults tr = StartTest();
             exc.RunFunction(mod.GetExportedFunction("DoTest"));
 
             tr.TestExpectations(expected.ToArray());
