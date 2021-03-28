@@ -1,0 +1,18 @@
+// Testing basic single precision FP subtraction.
+//
+// >> Name: "Float Sub"
+// >> Resultsf: {5.0, 15.0, -12.3456}
+//
+
+
+extern void LogTestf(float loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	LogTestf(10.0f - 5.0f);
+	LogTestf(10.0f - -5.0f);
+	LogTestf(0.0f - 12.3456f);
+	
+	EndTest();
+}

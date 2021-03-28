@@ -1,0 +1,18 @@
+// Testing for FP multiplication.
+//
+// >> Name: "Basic"
+// >> Resultsf: {10.0, 24.69, 17.01}
+//
+
+
+extern void LogTestf(float loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	LogTestf(1.0f * 10.0f);
+	LogTestf(2.0f * 12.345f);
+	LogTestf(-3.0f * -5.67f);
+	
+	EndTest();
+}

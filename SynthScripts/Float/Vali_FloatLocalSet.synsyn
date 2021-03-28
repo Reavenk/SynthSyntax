@@ -1,0 +1,23 @@
+// Testing setting FP values.
+//
+// >> Name: "Local Set"
+// >> Resultsf: {5.5, 21.0, 96.8}
+//
+
+
+extern void LogTestf(float loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	float a = 5.5f;
+	
+	LogTestf(a);
+	a = a * 2;
+	LogTestf(a + 10.0f);
+	
+	a = a * 4;
+	LogTestf( a * 2.2f);
+	
+	EndTest();
+}

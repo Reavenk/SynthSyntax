@@ -1,0 +1,22 @@
+// Testing fetching FP values of local scope variables.
+//
+// >> Name: "Local Get"
+// >> Resultsf: {5.0, 10.0, 38.268, 35.866}
+//
+
+
+extern void LogTestf(float loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	float a = 5.0f;
+	float b = 12.345f + 6.789f;
+	
+	LogTestf(a);
+	LogTestf(a * 2.0f);
+	LogTestf(b + b);
+	LogTestf(a - b + 50.0f);
+	
+	EndTest();
+}

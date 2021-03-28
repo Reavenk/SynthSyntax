@@ -382,11 +382,13 @@ namespace PxPre.SynthSyn
                 }
             }
 
-            for (int i = nodes.Count - 1; i >= 0; --i)
+            for (int i = nodes.Count - 1; i >= 1 ; --i)
             {
-                if (
-                    nodes[i].root.Matches(TokenType.tySymbol, "+") == true ||
-                    nodes[i].root.Matches(TokenType.tySymbol, "-") == true)
+                if (nodes[i].root.Matches(TokenType.tySymbol, "+") == true)
+                    return CreatePivot(nodes, i, scope, false);
+                else if(
+                    nodes[i].root.Matches(TokenType.tySymbol, "-") == true &&
+                    nodes[i-1].root.Matches(TokenType.tySymbol) == false)
                 {
                     return CreatePivot(nodes, i, scope, false);
                 }
@@ -489,25 +491,43 @@ namespace PxPre.SynthSyn
                 }
                 else if (nodes[i].root.MatchesSymbol("(") == true)
                 { 
-                    // Either a cast or function parameters. Either way, we separate with a comma for now.
-                    TokenTree nodeIdx = new TokenTree("paren");
-                    nodeIdx.root = nodes[i].root;
-
-                    List<Token> parenToks = nodes[i].toksToProcess;
-                    while(parenToks.Count > 0)
+                    if(
+                        i != 0 && 
+                        nodes[i-1].root.Matches( TokenType.tySymbol) == true && 
+                        (nodes[i-1].root.MatchesSymbol("(") == false && nodes[i-1].root.MatchesSymbol("[") == false))
                     { 
-                        int iter = 0;
-                        Parser.MovePastScopeTComma(ref iter, parenToks);
-                        nodes[i].nodes.Add(EatTokensIntoTree(parenToks.GetRange(0, iter), scope, false));
-                        parenToks.RemoveRange(0, iter);
+                        if(nodes.Count != 2)
+                            throw new SynthExceptionSyntax(nodes[i - 1].root, "Unexpected use of operated parenthesis.");
+
+                        // Parenthesis as a stand-alone scope that's being operated on, such 
+                        // as an expression that has a negative sign in front of it.
+                        nodes[i-1].nodes.Add(ConsolidateTokenTree(new List<TokenTree>{ nodes[i] }, scope, false));
+                        return nodes[i-1];
                     }
+                    else
+                    {
+                        // Parenthesis standing on its own, or as a function call.
 
-                    List<TokenTree> pre = nodes.GetRange(0, i);
-                    nodeIdx.nodes.Add(nodes[i]);
-                    nodeIdx.nodes.Add(ConsolidateTokenTree(pre, scope, false));
+                        // Either a cast or function parameters. Either way, we separate with a 
+                        // comma for now.
+                        TokenTree nodeIdx = new TokenTree("paren");
+                        nodeIdx.root = nodes[i].root;
 
-                    return nodeIdx;
+                        List<Token> parenToks = nodes[i].toksToProcess;
+                        while(parenToks.Count > 0)
+                        { 
+                            int iter = 0;
+                            Parser.MovePastScopeTComma(ref iter, parenToks);
+                            nodes[i].nodes.Add(EatTokensIntoTree(parenToks.GetRange(0, iter), scope, false));
+                            parenToks.RemoveRange(0, iter);
+                        }
 
+                        List<TokenTree> pre = nodes.GetRange(0, i);
+                        nodeIdx.nodes.Add(nodes[i]);
+                        nodeIdx.nodes.Add(ConsolidateTokenTree(pre, scope, false));
+
+                        return nodeIdx;
+                    }
                 }
                 else if(nodes[i].root.MatchesSymbol("[") == true)
                 { 
@@ -527,6 +547,18 @@ namespace PxPre.SynthSyn
 
                     return nodeIdx;
                 }
+            }
+
+            if (nodes[0].root.Matches(TokenType.tySymbol, "-") == true)
+            {
+                if(nodes.Count != 2)
+                    throw new SynthExceptionSyntax(nodes[0].root, "Negation used with unexpected syntax.");
+
+                TokenTree astExpr = ConsolidateTokenTree(new List<TokenTree> { nodes[1] }, scope, false);
+                nodes[0].nodes.Add(astExpr);
+                nodes.RemoveAt(1);
+
+                return nodes[0];
             }
 
             throw new SynthExceptionSyntax(nodes[0].root, "Unknown syntax.");

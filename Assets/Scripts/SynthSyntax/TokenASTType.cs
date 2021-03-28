@@ -42,6 +42,7 @@ namespace PxPre.SynthSyn
         Mul,
         Div,
         Mod,
+        Negate,
 
         BitOr,
         BitAnd,

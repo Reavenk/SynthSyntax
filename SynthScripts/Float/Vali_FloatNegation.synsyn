@@ -1,0 +1,18 @@
+// Testing negation of a FP expression.
+//
+// >> Name: "Float Negation"
+// >> Resultsf: {-12.345, -12.345, -61.725, -75.845}
+//
+
+
+extern void LogTestf(float loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	LogTestf(-12.345f);
+	LogTestf(-(12.345f));
+	LogTestf(-(12.345f * 5.0f));
+	LogTestf(-((12.345f * 5.0f)+(-(-6.12f - 8.0f))));
+	EndTest();
+}

@@ -737,9 +737,43 @@ namespace PxPre.SynthSyn
 
             if (node.root.MatchesSymbol("-") == true)
             {
-                TokenAST left, right;
-                EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
-                return new TokenAST(node.root, this, TokenASTType.Sub, null, left.evaluatingType, false, left, right);
+                if(node.nodes.Count == 1)
+                {
+                    TokenAST astExpr = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
+
+                    switch(astExpr.astType)
+                    {
+                        case TokenASTType.DeclFloat:
+                            {
+                                float f = float.Parse(astExpr.token.fragment);
+                                astExpr.token.fragment = (-f).ToString();
+                                return astExpr;
+                            }
+
+                        case TokenASTType.DeclFloat64:
+                            {
+                                double d = double.Parse(astExpr.token.fragment);
+                                astExpr.token.fragment = (-d).ToString();
+                                return astExpr;
+                            }
+
+                        case TokenASTType.Cast_Int:
+                        case TokenASTType.Cast_Int64:
+                            { 
+                                long l = long.Parse(astExpr.token.fragment);
+                                astExpr.token.fragment = (-l).ToString();
+                                return astExpr;
+                            }
+                    }
+
+                    return new TokenAST(node.root, this, TokenASTType.Negate, null, astExpr.evaluatingType, false, astExpr);
+                }
+                else
+                {
+                    TokenAST left, right;
+                    EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
+                    return new TokenAST(node.root, this, TokenASTType.Sub, null, left.evaluatingType, false, left, right);
+                }
             }
 
             if (node.root.MatchesSymbol("*") == true)
@@ -1855,7 +1889,57 @@ namespace PxPre.SynthSyn
                     break;
 
                 case TokenASTType.Cast_Float:
-                    break;
+                    { 
+                        if(expr.branches.Count != 1)
+                            throw new SynthExceptionImpossible("Attempting to cast float with unexpected number of branches.");
+
+                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnbc);
+
+                        if(vr.valLoc != ValueLoc.ValueOnStack)
+                            throw new SynthExceptionCompile("Only stack conversions are currently allowed.");
+
+                        switch(vr.varType.typeName)
+                        { 
+                            case "float":
+                                return vr;
+
+                            case "float64":
+                                fnbc.Add((byte)WASM.Instruction.f32_demote_f64);
+                                break;
+
+                            case "uint8":
+                            case "uint16":
+                            case "uint":
+                                fnbc.Add((byte)WASM.Instruction.f32_convert_i32_u);
+                                break;
+
+                            case "int8":
+                                fnbc.Add((byte)WASM.Instruction.i32_extend8_s);
+                                fnbc.Add((byte)WASM.Instruction.f32_convert_i32_s);
+                                break;
+
+                            case "int16":
+                                fnbc.Add((byte)WASM.Instruction.i32_extend16_s);
+                                fnbc.Add((byte)WASM.Instruction.f32_convert_i32_s);
+                                break;
+
+                            case "int":
+                                fnbc.Add((byte)WASM.Instruction.f32_convert_i32_s);
+                                break;
+
+                            case "int64":
+                                fnbc.Add((byte)WASM.Instruction.f32_convert_i64_s);
+                                break;
+
+                            case "uint64":
+                                fnbc.Add((byte)WASM.Instruction.f32_convert_i64_u);
+                                break;
+
+                            default:
+                                throw new SynthExceptionSyntax(expr.token, $"Cast to float not supported for type {vr.varType.typeName}.");
+                        }
+                        return new ValueRef(ValueLoc.ValueOnStack, -1, -1, fnd.GetType("float"));
+                    }
 
                 case TokenASTType.Cast_Double:
                     break;
@@ -1914,6 +1998,49 @@ namespace PxPre.SynthSyn
                             return new ValueRef( ValueLoc.ValueOnStack, 0, 0, fn.returnType);
                         else
                             return new ValueRef(ValueLoc.ValueOnMem, 0, 0, fn.returnType);
+                    }
+
+                case TokenASTType.Negate:
+                    { 
+                        if(expr.branches.Count != 1)
+                            throw new SynthExceptionImpossible("Negate encountered with unexpected AST branches.");
+
+                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnbc);
+                        switch(vr.varType.typeName)
+                        { 
+                            case "int8":
+                            case "uint8":
+                            case "int16":
+                            case "uin16":
+                            case "int":
+                            case "uint":
+                                fnbc.Add((byte)WASM.Instruction.i32_const);
+                                fnbc.AddRange(WASM.BinParse.EncodeSignedLEB(-1));
+                                fnbc.Add((byte)WASM.Instruction.i32_mul);
+                                return new ValueRef(ValueLoc.ValueOnStack, -1, -1, vr.varType);
+
+                            case "int64":
+                            case "uint64":
+                                fnbc.Add((byte)WASM.Instruction.i64_const);
+                                fnbc.AddRange(WASM.BinParse.EncodeSignedLEB(-1));
+                                fnbc.Add((byte)WASM.Instruction.i64_mul);
+                                return new ValueRef(ValueLoc.ValueOnStack, -1, -1, vr.varType);
+
+                            case "float":
+                                fnbc.Add((byte)WASM.Instruction.f32_const);
+                                fnbc.AddRange(System.BitConverter.GetBytes(-1.0f));
+                                fnbc.Add((byte)WASM.Instruction.f32_mul);
+                                return new ValueRef(ValueLoc.ValueOnStack, -1, -1, vr.varType);
+
+                            case "float64":
+                                fnbc.Add((byte)WASM.Instruction.f64_const);
+                                fnbc.AddRange(System.BitConverter.GetBytes(-1.0));
+                                fnbc.Add((byte)WASM.Instruction.f64_mul);
+                                return new ValueRef(ValueLoc.ValueOnStack, -1, -1, vr.varType);
+
+                            default:
+                                throw new SynthExceptionSyntax(expr.token, "Negating unsupported type.");
+                        }
                     }
 
                 case TokenASTType.DefaultParam:

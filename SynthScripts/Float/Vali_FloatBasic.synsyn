@@ -1,0 +1,19 @@
+// Testing basic float constant declarations.
+//
+// >> Name: "Float Basic"
+// >> Resultsf: {0.0, 10.0, 12.345, -1.0, -12.345}
+//
+
+
+extern void LogTestf(float loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	LogTestf(0.0f);
+	LogTestf(10.0f);
+	LogTestf(12.345f);
+	LogTestf(-1.0f);
+	LogTestf(-12.345f);
+	EndTest();
+}

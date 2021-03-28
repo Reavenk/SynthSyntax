@@ -1,0 +1,18 @@
+// Testing basic single precision FP addition.
+//
+// >> Name: "Float Add"
+// >> Resultsf: {0.0, 1, 19.134, -5.556}
+//
+
+
+extern void LogTestf(float loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	LogTestf(-1.0f 		+ 1.0f);
+	LogTestf(-0.0f 		+ 1.0f);
+	LogTestf(12.345f 	+ 6.789f);
+	LogTestf(-12.345f 	+ 6.789f);
+	EndTest();
+}

@@ -21,6 +21,12 @@ public static class UnitTest_Utils
         currentTest.results.Add(idx);
     }
 
+    public static void LogTestf(float v)
+    {
+        UnityEngine.Debug.Log($"Called LogTestf({v})");
+        currentTest.fResults.Add(v);
+    }
+
     public static void EndTest()
     {
         UnityEngine.Debug.Log("called EndTest()");
@@ -29,13 +35,34 @@ public static class UnitTest_Utils
 
     public static void SetupTestingContext(ExecutionContext ec)
     { 
-        ec.importData.SetFunction(
-            "ImportedFns", 
-            "LogTest", 
-            new ImportFunction_Refl(
-                typeof(UnitTest_Utils).GetMethod(
-                    "LogTest", 
-                    System.Reflection.BindingFlags.Public|System.Reflection.BindingFlags.Static)));
+        StoreDeclarations.ModuleRecord impMod = ec.importData.storeDecl.GetModuleRecord("ImportedFns");
+        foreach(string str in impMod.functions.Keys)
+        { 
+            if(str == "LogTest")
+            {
+                ec.importData.SetFunction(
+                    "ImportedFns",
+                    "LogTest",
+                    new ImportFunction_Refl(
+                        typeof(UnitTest_Utils).GetMethod(
+                            "LogTest",
+                            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)));
+            }
+            else if(str == "LogTestf")
+            {
+                ec.importData.SetFunction(
+                    "ImportedFns",
+                    "LogTestf",
+                    new ImportFunction_Refl(
+                        typeof(UnitTest_Utils).GetMethod(
+                            "LogTestf",
+                            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)));
+            }
+        }
+
+        
+
+
 
         ec.importData.SetFunction(
             "ImportedFns",
@@ -61,10 +88,14 @@ public static class UnitTest_Utils
         Debug.Log($"Using the full path {fullPath}");
 
         string testName;
-        List<int> expected = new List<int>();
+        List<int> expected;
+        List<float> expectedf;
 
-        if(LoadContainTestMarkup(filepath, out testName, expected) == false)
+        if(LoadContainTestMarkup(filepath, out testName, out expected, out expectedf) == false)
             throw new System.Exception($"Test at {filepath} was expected to be contained, but is missing test information.");
+
+        if(expected == null && expectedf == null)
+            throw new System.Exception($"Test at {filepath} do not have expected answer keys to test against.");
 
         using (var logScope = new SynthLog.LogScope())
         {
@@ -81,13 +112,25 @@ public static class UnitTest_Utils
             TestResults tr = StartTest();
             exc.RunFunction(mod.GetExportedFunction("DoTest"));
 
-            tr.TestExpectations(expected.ToArray());
+            if(expected != null)
+                tr.TestExpectations(expected.ToArray());
+
+            if(expectedf != null)
+                tr.TestExpectations(expectedf.ToArray());
+
         }
     }
 
-    public static bool LoadContainTestMarkup(string testFile, out string testName, List<int> results)
+    public static bool LoadContainTestMarkup(
+        string testFile, 
+        out string testName, 
+        out List<int> results,
+        out List<float> fresults)
     {
         testName = string.Empty;
+
+        results = null;
+        fresults = null;
 
         int setName = 0;
         int loadResults = 0;
@@ -123,20 +166,23 @@ public static class UnitTest_Utils
                 ++setName;
             }
             else if(key.Equals("results", System.StringComparison.OrdinalIgnoreCase) == true)
+            {
+                results = new List<int>();
+
+                string [] res = GetResultsTokens(str, mkuVP);
+                foreach(string r in res)
+                    results.Add(int.Parse(r.Trim()));
+
+                ++loadResults;
+            }
+            else if(key.Equals("resultsf", System.StringComparison.OrdinalIgnoreCase) == true)
             { 
-                string resStr = str.Substring(mkuVP + 1).Trim();
-                if(
-                    resStr.Length >= 2 &&
-                    resStr[0] == '{' &&
-                    resStr[resStr.Length - 1] == '}')
-                {
-                    resStr = resStr.Substring( 1, resStr.Length - 2);
-                }
-                string[] segs = resStr.Split(new char[]{',' });
-                foreach(string se in segs)
-                {
-                    results.Add(int.Parse(se));
-                }
+                fresults = new List<float>();
+
+                string[] res = GetResultsTokens(str, mkuVP);
+                foreach (string r in res)
+                    fresults.Add(float.Parse(r.Trim()));
+
                 ++loadResults;
             }
         }
@@ -144,5 +190,19 @@ public static class UnitTest_Utils
         return 
             setName == 1 && 
             loadResults == 1;
+    }
+
+    static string [] GetResultsTokens(string resultsLine, int colonIdx)
+    {
+        string resStr = resultsLine.Substring(colonIdx + 1).Trim();
+        if (
+            resStr.Length >= 2 &&
+            resStr[0] == '{' &&
+            resStr[resStr.Length - 1] == '}')
+        {
+            resStr = resStr.Substring(1, resStr.Length - 2);
+        }
+        string[] segs = resStr.Split(new char[] { ',' });
+        return segs;
     }
 }

@@ -1,0 +1,20 @@
+// A bare bones test for testing
+//	- basic compilation
+//	- ability for PxPreWASM to take in the output
+//	- PxPreWASM and SynthSyn function integration
+//	- SynthSyn unit testing functions LogTest and EndTest
+//
+// >> Name: "Basic"
+// >> Resultsf: {3.66666666, 9.0}
+//
+
+
+extern void LogTestf(float loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	LogTestf(1.0f + 2.0f / 3.0f * 4.0f);
+	LogTestf(5.0f + (1.0f + 2.0f) / 3.0f * 4.0f);
+	EndTest();
+}
