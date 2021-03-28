@@ -546,20 +546,17 @@ namespace PxPre.SynthSyn
                     codeSection.AddRange(fn.fnBin);
                 }
 
-                List<byte> startFn = new List<byte>();
-                startFn.Add(0); // Local declarations
+                WASMByteBuilder startFn = new WASMByteBuilder();
+                startFn.bin.Add(0); // Local declarations
                 // Set the starting stack position (4) in memory. This is basically the stack position, but
                 // we reserve the first 4 bytes for the stack information.
-                startFn.Add((byte)WASM.Instruction.i32_const);
-                startFn.Add(4);
-                startFn.Add((byte)WASM.Instruction.i32_const);
-                startFn.Add(0);
-                startFn.Add((byte)WASM.Instruction.i32_store);
-                startFn.Add(0); // Align
-                startFn.Add(0); // Offset
-                startFn.Add((byte)WASM.Instruction.end);
-                codeSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)startFn.Count));
-                codeSection.AddRange(startFn);
+                startFn.AddInstrI32Const(4);
+                startFn.AddInstrI32Const(0);
+                startFn.AddInstrI32Store();
+                startFn.AddInstrI32End();
+                //
+                codeSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)startFn.bin.Count));
+                codeSection.AddRange(startFn.bin);
 
                 fileContent.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)codeSection.Count));
                 fileContent.AddRange(codeSection);
