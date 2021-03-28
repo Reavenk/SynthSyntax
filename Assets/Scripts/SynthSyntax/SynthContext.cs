@@ -277,6 +277,7 @@ namespace PxPre.SynthSyn
 
             // TODO: Consider removing the WASMSection class (in another file)
 
+
             foreach (var kvp in this.functions)
             {
                 List<SynthFuncDecl> lst = kvp.Value;
@@ -293,19 +294,22 @@ namespace PxPre.SynthSyn
             //      FUNCTION TYPE DECLARATIONS
             //      "Type"s
             //////////////////////////////////////////////////
+            
+            int startFnType = build.GetOrAddFunctionType(WASM.Bin.TypeID.Result, new List<WASM.Bin.TypeID>());
             fileContent.Add( (byte)WASM.Bin.Section.TypeSec );
             { 
                 List<byte> typeSection = new List<byte>();
             
                 // Function type count
+                // + 1 for the start function
                 typeSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)build.functionTypes.Count));
 
-                for(int i = 0; i < build.functionTypes.Count; ++i)
+                for (int i = 0; i < build.functionTypes.Count; ++i)
                 { 
                     WASMBuild.FunctionType fty = build.functionTypes[i];
 
                     // Function tag
-                    typeSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)WASM.Bin.TypeID.Function));
+                    typeSection.Add((byte)WASM.Bin.TypeID.Function);
 
                     // Param count
                     typeSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)fty.paramTys.Count));
@@ -325,7 +329,7 @@ namespace PxPre.SynthSyn
                         typeSection.Add((byte)fty.retTy);
                     }
                 }
-            
+
                 fileContent.AddRange(WASM.BinParse.EncodeSignedLEB(typeSection.Count));
                 fileContent.AddRange(typeSection);
             }
@@ -373,14 +377,19 @@ namespace PxPre.SynthSyn
                 List<byte> functionSection = new List<byte>();
 
                 // Function Count
-                functionSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)lstLocalFns.Count));
+                functionSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)lstLocalFns.Count + 1));
             
                 for(int i = 0; i < lstLocalFns.Count; ++i)
                     functionSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)lstLocalFns[i].typeIndex));
-            
+
+                functionSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)startFnType));
+
                 fileContent.AddRange(WASM.BinParse.EncodeSignedLEB(functionSection.Count));
                 fileContent.AddRange(functionSection);
             }
+
+            int startIdx = -1; // The start index function
+            startIdx = build.functionInfos.Count;
 
             //
             //      TABLE DECLARACTIONS
@@ -404,8 +413,11 @@ namespace PxPre.SynthSyn
             { 
                 List<byte> memorySection = new List<byte>();
             
-                memorySection.AddRange(WASM.BinParse.EncodeUnsignedLEB(0));
-            
+                memorySection.AddRange(WASM.BinParse.EncodeUnsignedLEB(1));
+                memorySection.Add(0); // flags
+                memorySection.Add(2); // initial page ct
+
+
                 fileContent.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)memorySection.Count));
                 fileContent.AddRange(memorySection);
             }
@@ -418,7 +430,13 @@ namespace PxPre.SynthSyn
             { 
                 List<byte> globalsSection = new List<byte>();
             
-                globalsSection.AddRange(WASM.BinParse.EncodeUnsignedLEB(0));
+                globalsSection.AddRange(WASM.BinParse.EncodeUnsignedLEB(1));
+                //
+                globalsSection.Add((byte)WASM.Bin.TypeID.Int32); // Type
+                globalsSection.Add(0); // Not mutable
+                globalsSection.Add((byte)WASM.Instruction.i32_const);
+                globalsSection.AddRange(WASM.BinParse.EncodeSignedLEB(build.stackMemByteCt));
+                globalsSection.Add((byte)WASM.Instruction.end);
 
                 fileContent.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)globalsSection.Count));
                 fileContent.AddRange(globalsSection);
@@ -440,6 +458,7 @@ namespace PxPre.SynthSyn
                     ++exportedCt;
                 }
 
+                ++exportedCt; // +1 for global MemStkSize
                 exportSection.AddRange(WASM.BinParse.EncodeUnsignedLEB(exportedCt));
 
                 // Iterate through it again the same way, but actually save out instead of count this time.
@@ -454,6 +473,12 @@ namespace PxPre.SynthSyn
                     exportSection.AddRange(WASM.BinParse.EncodeUnsignedLEB(lstLocalFns[i].functionIndex));
                 }
 
+                // Add export of MemStkSize
+                exportSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)"MemStkSize".Length));
+                exportSection.AddRange(System.Text.Encoding.ASCII.GetBytes("MemStkSize"));
+                exportSection.Add(3); // kind - TODO: Does PreWASM have this defined somewhere?
+                exportSection.Add(0); // Global index
+
                 fileContent.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)exportSection.Count));
                 fileContent.AddRange(exportSection);
             }
@@ -462,17 +487,16 @@ namespace PxPre.SynthSyn
             //      --
             //      "Start"
             //////////////////////////////////////////////////
-            //fileContent.Add((byte)WASM.Bin.Section.StartSec);
-            //{
-            //    List<byte> startSection = new List<byte>();
-            //
-            //    int startFnID = 0;
-            //    startSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)startFnID));
-            //
-            //
-            //    fileContent.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)startSection.Count));
-            //    fileContent.AddRange(startSection);
-            //}
+            fileContent.Add((byte)WASM.Bin.Section.StartSec);
+            {
+                List<byte> startSection = new List<byte>();
+            
+                startSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)startIdx));
+            
+            
+                fileContent.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)startSection.Count));
+                fileContent.AddRange(startSection);
+            }
 
             //
             //      --
@@ -497,7 +521,7 @@ namespace PxPre.SynthSyn
                 List<byte> codeSection = new List<byte>();
 
                 // Num functions
-                codeSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)lstLocalFns.Count));
+                codeSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)lstLocalFns.Count + 1));
 
                 for (int i = 0; i < lstLocalFns.Count; ++i)
                 {
@@ -512,6 +536,21 @@ namespace PxPre.SynthSyn
                     // Locals byte size
                     codeSection.AddRange(fn.fnBin);
                 }
+
+                List<byte> startFn = new List<byte>();
+                startFn.Add(0); // Local declarations
+                // Set the starting stack position (4) in memory. This is basically the stack position, but
+                // we reserve the first 4 bytes for the stack information.
+                startFn.Add((byte)WASM.Instruction.i32_const);
+                startFn.Add(4);
+                startFn.Add((byte)WASM.Instruction.i32_const);
+                startFn.Add(0);
+                startFn.Add((byte)WASM.Instruction.i32_store);
+                startFn.Add(0); // Align
+                startFn.Add(0); // Offset
+                startFn.Add((byte)WASM.Instruction.end);
+                codeSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)startFn.Count));
+                codeSection.AddRange(startFn);
 
                 fileContent.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)codeSection.Count));
                 fileContent.AddRange(codeSection);

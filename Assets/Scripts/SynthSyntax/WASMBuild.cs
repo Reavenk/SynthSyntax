@@ -61,9 +61,12 @@ namespace PxPre.SynthSyn
 
         public SynthStringRepo stringRepo = new SynthStringRepo();
 
-        public WASMBuild(SynthContext rootContext)
+        public readonly int stackMemByteCt = 1024;
+
+        public WASMBuild(SynthContext rootContext, int stackMemByteCt = 1024)
         { 
             this.rootContext = rootContext;
+            this.stackMemByteCt = stackMemByteCt;
         }
 
         public FunctionType TurnFnTypeIntoWASMType(SynthFuncDecl fnd)
@@ -100,6 +103,39 @@ namespace PxPre.SynthSyn
 
             return fnNew;
 
+        }
+
+        public int GetOrAddFunctionType(WASM.Bin.TypeID retTy, List<WASM.Bin.TypeID> paramTys)
+        { 
+            foreach(FunctionType fty in this.functionTypes)
+            { 
+                if(retTy != fty.retTy)
+                    continue;
+
+                if(fty.paramTys.Count != paramTys.Count)
+                    continue;
+
+                bool matches = true;
+                for(int i = 0; i < paramTys.Count; ++i)
+                { 
+                    if(paramTys[i] != fty.paramTys[i])
+                    { 
+                        matches = false;
+                        break;
+                    }
+                }
+
+                if(matches == false)
+                    continue;
+
+                return fty.index;
+            }
+
+            // We didn't find a match, so we need to add the entry in.
+            FunctionType ftyNew = new FunctionType(this.functionTypes.Count, retTy, paramTys);
+            this.functionTypes.Add(ftyNew);
+
+            return ftyNew.index;
         }
 
         WASM.Bin.TypeID GetTrueParamReturnType(SynthType st)
