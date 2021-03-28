@@ -101,7 +101,8 @@ public static class UnitTest_Utils
         {
             SynthContext ctx = new SynthContext();
             ctx.ParseFile(filepath);
-            byte[] wasmBin = ctx.BuildWASM();
+            WASMBuild wasmBuild = new WASMBuild(ctx);
+            byte[] wasmBin = wasmBuild.BuildWASM();
 
             System.IO.File.WriteAllBytes("test.Wasm", wasmBin);
 

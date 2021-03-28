@@ -34,6 +34,7 @@ namespace PxPre.SynthSyn
         protected Dictionary<string, SynthType> typesDefs = new Dictionary<string, SynthType>();
 
         protected Dictionary<string, List<SynthFuncDecl>> functions = new Dictionary<string, List<SynthFuncDecl>>();
+        public IReadOnlyDictionary<string, List<SynthFuncDecl>> Functions {get{return this.functions; } }
 
         // Either local variables of a function, or member variables.
         protected List<SynthVarValue> varDefs = new List<SynthVarValue>();
