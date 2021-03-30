@@ -80,7 +80,7 @@ namespace PxPre.SynthSyn
             return null;
         }
 
-        public SynthVarValue GetVar(string name, bool recursion = true)
+        public virtual SynthVarValue GetVar(string name, bool recursion = true)
         { 
             SynthVarValue ret;
             if(this.varLookups.TryGetValue(name, out ret) == true)
@@ -223,37 +223,25 @@ namespace PxPre.SynthSyn
                 throw new SynthExceptionImpossible("Attemping to add variable to unknown destination");
         }
 
-        public void AddFunction(SynthFuncDecl function)
+        public void AddFunction(SynthFuncDecl fnAdding)
         {
             List<SynthFuncDecl> fns;
-            if(this.functions.TryGetValue(function.functionName, out fns) == false)
+            if(this.functions.TryGetValue(fnAdding.functionName, out fns) == false)
             { 
                 fns = new List<SynthFuncDecl>();
-                this.functions.Add(function.functionName, fns);
+                this.functions.Add(fnAdding.functionName, fns);
             }
             else 
             { 
                 // Check if there's a signature collision with function overloads
                 foreach(SynthFuncDecl already in fns)
                 { 
-                    if(already.paramList.Count != function.paramList.Count)
-                        continue;
-
-                    bool diff = false;
-                    for(int i = 0; i < already.paramList.Count; ++i)
-                    { 
-                        if(already.paramList[i].typeName != function.paramList[i].typeName)
-                        {
-                            diff = true;
-                            break;
-                        }
-                        if(diff == false)
-                            throw new System.Exception($"Function declaration {function.functionName} already included");
-                    }
+                    if(already.parameterSet.ExactlyMatches(fnAdding.parameterSet) == true)
+                            throw new System.Exception($"Function declaration {fnAdding.functionName} already included");
                 }
             }
 
-            fns.Add(function);
+            fns.Add(fnAdding);
         }
 
         public void AddType(SynthType type)
@@ -336,7 +324,7 @@ namespace PxPre.SynthSyn
 
             foreach(SynthFuncDecl sfc in fns)
             { 
-                if(sfc.paramList.Count != 1 || sfc.isStatic == true)
+                if(sfc.parameterSet.Count != 1 || sfc.isStatic == true)
                     continue;
 
                 switch(revMode)
@@ -352,7 +340,7 @@ namespace PxPre.SynthSyn
                         break;
                 }
 
-                if(sfc.paramList[0].type == otherType)
+                if(sfc.parameterSet.Get(0).type == otherType)
                     return sfc;
             }
 

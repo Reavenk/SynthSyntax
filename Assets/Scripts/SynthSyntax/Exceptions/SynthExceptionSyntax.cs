@@ -19,7 +19,7 @@ namespace PxPre.SynthSyn
         }
 
         public SynthExceptionSyntax(Token t, string why)
-            : base(why)
+            : base($"Syntax Error line {t.line}: " + why)
         {
             SynthLog.Log($"Syntax Error line {t.line}: " + why);
         }

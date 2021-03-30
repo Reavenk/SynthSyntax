@@ -2,6 +2,9 @@
 
 namespace PxPre.SynthSyn
 {
+    /// <summary>
+    /// SynthSyntax Function declaration and definition.
+    /// </summary>
     public class SynthFuncDecl : SynthScope
     {
         [System.Flags]
@@ -21,13 +24,25 @@ namespace PxPre.SynthSyn
             StructContext   = Static | Member | Constructor
         }
 
+        /// <summary>
+        /// The name of the function.
+        /// </summary>
         public string functionName;
 
+        /// <summary>
+        /// The name of the return type. This will be defined from parsing
+        /// the source code before - and depending on the phase of compilation,
+        /// the actual return type may not even be processed yet.
+        /// </summary>
         public string returnTyName;
+
+        /// <summary>
+        /// A reference to the processed return type - the type (in scope) whos
+        /// typename matches returnTyName.
+        /// </summary>
         public SynthType returnType;
 
-        public List<SynthVarValue> paramList = new List<SynthVarValue>();
-        public Dictionary<string, SynthVarValue> paramLookup = new Dictionary<string, SynthVarValue>();
+        public SynthFuncParamSet parameterSet = new SynthFuncParamSet();
 
         public List<SynthRegion> regionList = new List<SynthRegion>();
         public Dictionary<string, SynthRegion> regionLookup = new Dictionary<string, SynthRegion>();
@@ -353,30 +368,16 @@ namespace PxPre.SynthSyn
             if(this.isStatic == false)
             { 
                 SynthType styThis = this.GetStructScope();
-                if(styThis == null)
-                    throw new SynthExceptionImpossible("No parent struct type to define 'this' for struct function.");
-
-                SynthVarValue svvThis = new SynthVarValue();
-                svvThis.type = styThis;
-                svvThis.typeName = styThis.typeName;
-                svvThis.varName = "this";
-                svvThis.varLoc = SynthVarValue.VarLocation.ThisRef;
-
-                this.paramList.Add(svvThis);
-                this.paramLookup.Add(svvThis.varName, svvThis);
+                this.parameterSet.AddThisParam(styThis);
             }
 
             while(paramsPhrase.Count > 0) 
             { 
                 SynthVarValue varParam = SynthVarValue.ParseParameter(paramsPhrase);
-
-                if(varParam != null)
-                {
-                    this.paramList.Add(varParam);
-                    this.paramLookup.Add(varParam.varName, varParam);
-                }
-                else
+                if (varParam == null)
                     throw new System.Exception($"Unexpected parameter declaration on line {paramsPhrase[0].line}.");
+
+                this.parameterSet.AddParameter(varParam);
 
                 if(paramsPhrase.Count > 0)
                 {
@@ -466,15 +467,18 @@ namespace PxPre.SynthSyn
             //      VERIFY PARAMETER TYPES
             //////////////////////////////////////////////////
             SynthLog.LogIndent(logIndent + 1, "Checking parameter types:");
-            if(this.paramList.Count == 0)
+
+            this.parameterSet._Validate(this);
+
+            if(this.parameterSet.Count == 0)
             {
                 SynthLog.LogIndent(logIndent + 2, "No parameters.");
             }
             else
             {
-                for (int i = 0; i < this.paramList.Count; ++i)
+                for (int i = 0; i < this.parameterSet.Count; ++i)
                 { 
-                    SynthVarValue svvParam = this.paramList[i];
+                    SynthVarValue svvParam = this.parameterSet.Get(i);
 
                     SynthType p = this.GetType(svvParam.typeName);
                     if(p == null)
@@ -489,39 +493,9 @@ namespace PxPre.SynthSyn
                 }
             }
 
-            // Alignment of parameters
-            this.paramByteSize = 0;
-            foreach(SynthVarValue svv in this.paramList)
-            { 
-                svv.alignmentOffset = this.paramByteSize;
-                this.paramByteSize += svv.GetByteSize();
-            }
-
-            // Validation of default parameters.
-            bool startedDefaultSection = false;
-            foreach(SynthVarValue svv in this.paramList)
-            { 
-                if(svv.varName == "this")
-                    continue;
-
-                if (svv.declPhrase.Count < 2)
-                    throw new SynthExceptionImpossible($"Parameter {svv.varName} for function {this.functionName} found with less than 2 tokens.");
-
-                if(svv.declPhrase.Count > 2)
-                {
-                    // TODO: Hardcoded 2
-                     if(svv.declPhrase[2].Matches( TokenType.tySymbol, "=") == false)
-                        throw new SynthExceptionSyntax(svv.declPhrase[2], "Unexpected addition to parameter declaration on line.");
-
-
-
-                    startedDefaultSection = true;
-                }
-                else if(startedDefaultSection == true)
-                { 
-                    throw new SynthExceptionSyntax(svv.declPhrase[1], "All parameters after the first default parameter must also have default parameters.");
-                }
-            }
+            // It's arguable this should be in here since this is a validation
+            // function, and not a processing function.
+            this.parameterSet.PostTypeAlignment(this);
 
             base.Validate_AfterTypeAlignment(logIndent + 1);
 
@@ -545,6 +519,35 @@ namespace PxPre.SynthSyn
             builds.RegisterFunction(this);
 
             base.GatherFunctionRegistration(builds);
+        }
+
+        public SynthVarValue GetParameter(string name)
+        {
+            return this.parameterSet.Get(name);
+        }
+
+        public override SynthVarValue GetVar(string name, bool recursion = true)
+        { 
+            SynthVarValue svvParam = GetParameter(name);
+            if(svvParam != null)
+                return svvParam;
+
+            return base.GetVar(name, recursion);
+        }
+
+        /// <summary>
+        /// The term 'input' parameter refers to parameters that are explicitly 
+        /// given values in the source code. This is pretty much every parameter
+        /// except the 'this' variable (if the function even has one).
+        /// </summary>
+        /// <returns></returns>
+        public int GetInputParameters()
+        { 
+            if(this.isStatic == true)
+                return this.parameterSet.Count;
+
+            // Remove the first entry, which is assumed to be the 'this' parameter.
+            return this.parameterSet.Count - 1;
         }
     }
 }

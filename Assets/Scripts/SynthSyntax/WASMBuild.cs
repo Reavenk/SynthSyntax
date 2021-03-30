@@ -73,8 +73,8 @@ namespace PxPre.SynthSyn
         {
             WASM.Bin.TypeID retTy = GetTrueParamReturnType(fnd.returnType);
             List<WASM.Bin.TypeID> paramTy = new List<WASM.Bin.TypeID>();
-            for(int i = 0; i < fnd.paramList.Count; ++i)
-                paramTy.Add(GetTrueParamReturnType(fnd.paramList[i].type));
+            for(int i = 0; i < fnd.parameterSet.Count; ++i)
+                paramTy.Add(GetTrueParamReturnType(fnd.parameterSet.Get(i).type));
 
             for(int i = 0; i < this.functionTypes.Count; ++i)
             {
@@ -647,8 +647,8 @@ namespace PxPre.SynthSyn
                 SynthLog.LogIndent(0, $"Scope {i}");
                 SynthLog.LogIndent(1, $"Line number : {builders[i].lineNumber}");
                 SynthLog.LogIndent(1, $"Stack Elements : Ele {builders[i].locStkEle.Count} - Vars {builders[i].locStkVars.Count}");
-                SynthLog.LogIndent(1, $"Memory Stack : Ele {builders[i].memStkEle.Count} - Vars {builders[i].memStkVars.Count}");
-                SynthLog.LogIndent(1, $"Total Memory Stack : {builders[i].totalMemoryStack} - Total Memory Stack Bytes : {builders[i].totalMemoryStackBytes}");
+                SynthLog.LogIndent(1, $"Memory Stack : Vars {builders[i].memStkVars.Count}");
+                SynthLog.LogIndent(1, $"Total Memory Stack : Bytes {builders[i].totalMemoryStackBytes}");
             }
 
             SynthLog.Log("");
@@ -661,8 +661,13 @@ namespace PxPre.SynthSyn
             // byte alignment and the indices of local stack variables. This is done with
             // CompileAlignment, who's lower scopes should appear earlier in the builders
             // list before higher children scopes.
-            foreach (SynthContextBuilder b in builders)
-                b.CompileAlignment();
+            for(int i = 0; i < builders.Count; ++i)
+            {
+                if(i == 0)
+                    builders[i].CompileAlignment(fnd);
+                else
+                    builders[i].CompileAlignment();
+            }
 
             // Gather all the local variables and declare them. This isn't as efficient as things
             // could be because after variables go out of scope, their positions on the stack
@@ -676,7 +681,7 @@ namespace PxPre.SynthSyn
             List<WASM.Bin.TypeID> localVarTys = new List<WASM.Bin.TypeID>();
             foreach (SynthContextBuilder b in builders)
             {
-                foreach (SynthContextBuilder.ValueRef stkVal in b.locStkEle)
+                foreach (ValueRef stkVal in b.locStkEle)
                 {
                     if (stkVal.varType.intrinsic == false)
                         throw new SynthExceptionCompile(""); // TODO: Error msg

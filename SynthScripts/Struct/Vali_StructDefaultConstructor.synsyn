@@ -17,8 +17,9 @@ struct TestStruct
 	
 	TestStruct()
 	{
-		a = 5;
-		this.b = 6;
+		
+		a = 5;			// testing implied this
+		this.b = 6;		// testing explicit this
 		d = 7;
 	}
 }

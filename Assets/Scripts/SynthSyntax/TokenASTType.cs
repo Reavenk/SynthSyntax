@@ -15,6 +15,7 @@ namespace PxPre.SynthSyn
         GetFunction,
         GetRegion,
         GetThis,
+        Construct,
 
         // Root AST node for function declarations. Will also have the 
         FunctionDecl,

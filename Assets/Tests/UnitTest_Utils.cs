@@ -23,7 +23,7 @@ public static class UnitTest_Utils
 
     public static void LogTestf(float v)
     {
-        UnityEngine.Debug.Log($"Called LogTestf({v})");
+        UnityEngine.Debug.Log($"Called LogTestf({v})"); 
         currentTest.fResults.Add(v);
     }
 

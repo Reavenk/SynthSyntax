@@ -24,153 +24,9 @@ namespace PxPre.SynthSyn
             Memory
         }
 
-        public enum ValueLoc
-        {
-            /// <summary>
-            /// The ValueRef return doesn't represent an operation
-            /// that resulted in a return value.
-            /// </summary>
-            NoValue,
+        
 
-            /// <summary>
-            /// Intrinsic value on the stack
-            /// </summary>
-            ValueOnStack,
-
-            ValueOnMemStack,
-
-            ValueOnHeap,
-
-            AddrLocal,
-            AddrParam,
-
-            /// <summary>
-            /// Intrinsic or non-instrinsic value who's pointer is on the stack. 
-            /// The pointer is an int.
-            /// </summary>
-            PointerOnStack,
-        }
-
-        public class ValueRef : SynthObj
-        { 
-            public ValueLoc valLoc;
-
-            /// <summary>
-            /// The local index on the stack - 
-            /// or if the variable doesn't exist on the stack, the pointer
-            /// to it.
-            /// </summary>
-            public int idx;
-
-            /// <summary>
-            /// The number of bytes on the memory -
-            /// or if the variable doesn't exist on the stack, the memory.
-            /// </summary>
-            public int byteAlign;
-
-            /// <summary>
-            /// The global scope version of idx;
-            /// </summary>
-            public int fnIdx;
-
-            /// <summary>
-            /// The global scope version of fnByteAlign.
-            /// </summary>
-            public int fnByteAlign;
-
-            /// <summary>
-            /// The pointer indirection amount. A value of 0 is the actual variable
-            /// value. A value of 1 is a pointer. A value of 2 is a pointer to a 
-            /// pointer, etc.
-            /// </summary>
-            public int pointerAmt = 0;
-
-            /// <summary>
-            /// How to interpret the ValueRef.
-            /// </summary>
-            public SynthType varType;
-
-            public ValueRef(ValueLoc valLoc, int idx, int byteAlign, SynthType varType, int pointerAmt = 0)
-            { 
-                this.valLoc = valLoc;
-                this.idx = idx;
-                this.byteAlign = byteAlign;
-                this.varType = varType;
-                this.pointerAmt = pointerAmt;
-            }
-
-            public void PutInstrinsicValueOnStack(WASMByteBuilder fnBuild)
-            { 
-                if(this.varType.intrinsic == false)
-                    throw new SynthExceptionImpossible("Attempting to get the value of a non-intrinsic type for an intrinsic operation.");
-
-                // If it's already on the stack, we're done
-                if(this.valLoc == ValueLoc.ValueOnStack)
-                    return;
-
-                if(this.valLoc == ValueLoc.AddrLocal)
-                { 
-                    switch(this.varType.typeName)
-                    { 
-                        case "bool":
-                        case "int8":
-                        case "uint8":
-                        case "int16":
-                        case "uint16":
-                        case "int":
-                        case "uint":
-                        case "int64":
-                        case "uint64":
-                        case "float":
-                        case "double":
-                            fnBuild.Add_LocalGet((uint)this.fnIdx);
-                            break;
-
-                        default:
-                            throw new SynthExceptionImpossible($"Failed to retrieve intrinsic value of type {this.varType.typeName}.");
-                    }
-                    return;
-                }
-
-                if(this.valLoc != ValueLoc.PointerOnStack)
-                    throw new SynthExceptionCompile("Attempting to get intrinsic value from unsupported location.");
-
-                switch(this.varType.typeName)
-                {
-                case "int8":
-                    fnBuild.Add_I32Load8_s();
-                    break;
-                case "uint8":
-                    fnBuild.Add_I32Load8_u();
-                    break;
-                case "int16":
-                    fnBuild.Add_I32Load16_s();
-                    break;
-                case "uint16":
-                    fnBuild.Add_I32Load16_u();
-                    break;
-                case "int":
-                case "uint":
-                    fnBuild.Add_I32Load();
-                    break;
-                case "int64":
-                case "uint64":
-                    fnBuild.Add_I64Load();
-                    break;
-
-                case "float":
-                    fnBuild.Add_F32Load();
-                    break;
-
-                case "double":
-                    fnBuild.Add_F64Load();
-                    break;
-
-                default:
-                    throw new SynthExceptionImpossible($"Failed to retrieve intrinsic value of type {this.varType.typeName}.");
-                }
-            }
-        }
+        
 
         /// <summary>
         /// The number of bytes pushed on the stack. Does not include local variables.
@@ -180,13 +36,11 @@ namespace PxPre.SynthSyn
         // TODO: Because of technical reason of the language beeing able to freely take the
         // address of any parameter in a generic way, parameters directly on the local stack
         // are probably not going to be supported, and everything is going to be on the memory stack.
-        public int totalLocalStackBytes = 0;
         public int totalLocalStack = 0;
         public List<ValueRef> locStkEle = new List<ValueRef>();
         public Dictionary<string, ValueRef> locStkVars = new Dictionary<string, ValueRef>();
 
         public int totalMemoryStackBytes = 0;
-        public int totalMemoryStack = 0;
         public List<ValueRef> memStkEle = new List<ValueRef>();
         public Dictionary<string, ValueRef> memStkVars = new Dictionary<string, ValueRef>();
 
@@ -276,10 +130,10 @@ namespace PxPre.SynthSyn
             {
                 // If we're dealing with an intrinsic value type, they're either 
                 // 4 or 8 bytes, and can fit on the actual WASM stack.
-                ValueRef vr = new ValueRef(ValueLoc.AddrLocal, locStkEle.Count, this.totalLocalStack, type);
+                ValueRef vr = new ValueRef(ValueLoc.LocalIdx, locStkEle.Count, this.totalLocalStack, type);
                 this.locStkEle.Add(vr);
                 this.locStkVars.Add(varName, vr);
-                this.totalLocalStack += type.GetByteSize();
+                ++this.totalLocalStack;
             }
             else
             { 
@@ -287,10 +141,10 @@ namespace PxPre.SynthSyn
                 // section. The biggest issue we're trying to solve with the secondary stack is
                 // arbitrary byte alignment. A traditional WASM stack can't run through variable
                 // bytes, and only allows alignments that are a multiple of 4.
-                ValueRef vr = new ValueRef(ValueLoc.ValueOnMemStack, memStkEle.Count, this.totalMemoryStack, type);
+                ValueRef vr = new ValueRef(ValueLoc.ValueOnMemStack, memStkEle.Count, this.totalMemoryStackBytes, type);
                 this.memStkEle.Add(vr);
                 this.memStkVars.Add(varName, vr);
-                this.totalMemoryStack += type.GetByteSize();
+                this.totalMemoryStackBytes += type.GetByteSize();
             }
         }
 
@@ -309,6 +163,10 @@ namespace PxPre.SynthSyn
             return null;
         }
 
+        /// <summary>
+        /// Perform CompileAlignment, but based the alignment off 
+        /// the parent scope.
+        /// </summary>
         public void CompileAlignment()
         { 
             int locMax = 0;
@@ -316,22 +174,48 @@ namespace PxPre.SynthSyn
 
             if(this.parent != null)
             { 
+                // This is more of a graceful handler for a situation that
+                // should never happen.
+                //
+                // The first scope's CompileAlignment (that has not parent) 
+                // should use the SyhtFuncDecl overload.
                 locMax = this.parent.totalLocalStack;
                 memMax = this.parent.totalMemoryStackBytes;
+
             }
+            this.CompileAlignment(locMax, memMax);
+        }
 
+        /// <summary>
+        /// Perform CompileAlignment for the base scope, which bases
+        /// alignment off the function parameters.
+        /// </summary>
+        /// <param name="fnBase"></param>
+        public void CompileAlignment(SynthFuncDecl fnBase)
+        {
+            this.CompileAlignment(
+                fnBase.parameterSet.TotalLocalIndices, 
+                fnBase.parameterSet.TotalMemStackByte);
+        }
 
-            for(int i = 0; i < this.locStkEle.Count; ++i)
+        private void CompileAlignment(int locBase, int memBase)
+        {
+
+            for (int i = 0; i < this.locStkEle.Count; ++i)
             {
                 ValueRef vr = this.locStkEle[i];
-                vr.fnIdx = locMax + vr.idx;
+                vr.fnIdx = locBase + vr.idx;
             }
 
-            for(int i = 0; i < this.memStkEle.Count; ++i)
-            { 
+
+            for (int i = 0; i < this.memStkEle.Count; ++i)
+            {
                 ValueRef vr = this.memStkEle[i];
-                vr.fnByteAlign = memMax + vr.byteAlign;
+                vr.fnByteAlign = memBase + vr.byteAlign;
             }
+
+            this.totalLocalStack += locBase;
+            this.totalMemoryStackBytes += memBase;
         }
 
         TokenAST ProcessMathTree(SynthScope scope, TokenTree tt)
@@ -691,6 +575,7 @@ namespace PxPre.SynthSyn
                 SynthType sty = function.GetType(node.root.fragment);
                 if(sty != null)
                 { 
+                    // Constructor is already handled elsewhere
                     if(node.nodes.Count < 1)
                         throw new SynthExceptionImpossible("Local variable declaration missing variable name.");
 
@@ -908,20 +793,49 @@ namespace PxPre.SynthSyn
                         astParams.Add(astParamVal);
                     }
 
-                    // Default params not supported for now
-                    TokenAST caller = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[1]);
+                    // Get the function
+                    // The top IF branch gets a direct function, whichch the lower ELSE can also do but
+                    // we need it because of constructors - since they have a distinct signature BUT
+                    // also clash with typenames.
+                    TokenAST caller = null;
+                    if (node.nodes[1].root.Matches(TokenType.tyWord) && node.nodes[1].nodes.Count == 0)
+                    {
+                        string fragName = node.nodes[1].root.fragment;
+
+                        // Similar (duplicate) of what's found in this.ProcessFunctionExpression - but done
+                        // under a different context.
+                        SynthCanidateFunctions canFns = function.GetCanidateFunctions(fragName);
+                        if (canFns == null || canFns.functions.Count > 0)
+                            caller = new TokenAST(node.root, this, TokenASTType.GetFunction, canFns, null, false, TokenAST.DataManifest.NoData);
+                        else
+                        { 
+                            // If it's a type, get a function from the type with the typenames -
+                            // which are the constructors.
+                            SynthType styFrag = function.GetType(fragName);
+                            if(styFrag != null)
+                            { 
+                                SynthCanidateFunctions consFns = styFrag.GetCanidateFunctions(fragName);
+                                if(consFns == null || consFns.functions.Count > 0)
+                                    caller = new TokenAST(node.root, this, TokenASTType.Construct, consFns, styFrag, false, TokenAST.DataManifest.NoData);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Default params not supported for now
+                        caller = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[1]);
+                    }
+
                     SynthCanidateFunctions cfns = caller.synthObj.CastCanidateFunctions();
                     if(cfns == null)
                         throw new SynthExceptionSyntax(node.nodes[1].root, "Could not evaluate function");
 
                     // We received a list of possible function overloads, now we find the appropriate one.
                     // For now we're going to be super-naive and just go off of parameter count.
-                    //
-                    // TODO: Imply "this" where needed.
                     List<SynthFuncDecl> matchingFns = new List<SynthFuncDecl>();
                     foreach(SynthFuncDecl sfn in cfns.functions)
                     { 
-                        if(sfn.paramList.Count != paramNum)
+                        if(sfn.GetInputParameters() != paramNum)
                             continue;
 
                         matchingFns.Add(sfn);
@@ -933,21 +847,22 @@ namespace PxPre.SynthSyn
                     // The function that has been resolved as the one for use.
                     SynthFuncDecl reslvFn = matchingFns[0];
 
-                    for (int i = 0; i < reslvFn.paramList.Count; ++i)
+                    int startParamIdx = reslvFn.isStatic ? 0 : 1;
+                    for (int i = startParamIdx, j = 0; i < reslvFn.parameterSet.Count; ++i, ++j)
                     { 
-                        TokenAST paramAST = astParams[i];
+                        TokenAST paramAST = astParams[j];
                         if(paramAST.evaluatingType == null)
                             throw new SynthExceptionSyntax(paramAST.token, $"Parameter {i} does not evaluate to any type.");
-                        else if (paramAST.evaluatingType.intrinsic == reslvFn.paramList[i].type.intrinsic)
+                        else if (paramAST.evaluatingType.intrinsic == reslvFn.parameterSet.Get(i).type.intrinsic)
                         {
                             // Throws if they do not match and there isn't an appropriate cast.
                             //
                             // NOTE: Not really sure what the manifest should be for the left here (for function
                             // parameters).
-                            EnsureIntrinsicCompatibility(reslvFn.paramList[i].type, TokenAST.DataManifest.ValueConst, ref paramAST);
+                            EnsureIntrinsicCompatibility(reslvFn.parameterSet.Get(i).type, TokenAST.DataManifest.ValueConst, ref paramAST);
                         }
-                        else if(paramAST.evaluatingType != reslvFn.paramList[i].type)
-                            throw new SynthExceptionSyntax(paramAST.token, $"Type mismatch for parameter {i}: expected type {reslvFn.paramList[i].type.typeName} but got {paramAST.evaluatingType.typeName}.");
+                        else if(paramAST.evaluatingType != reslvFn.parameterSet.Get(i).type)
+                            throw new SynthExceptionSyntax(paramAST.token, $"Type mismatch for parameter {i}: expected type {reslvFn.parameterSet.Get(i).type.typeName} but got {paramAST.evaluatingType.typeName}.");
                         // TODO: Not supported right now, but if they're not both intrinsic, classes may
                         // have conversion operators.
 
@@ -955,7 +870,19 @@ namespace PxPre.SynthSyn
                     }
 
                     caller.synthObj = reslvFn;
-                    caller.astType = TokenASTType.CallGlobalFn; // TODO: In the right context, figure out when to call members
+
+                    if(reslvFn.isStatic == true)
+                        caller.astType = TokenASTType.CallGlobalFn; 
+                    else if(reslvFn.isConstructor == true)
+                        caller.astType = TokenASTType.Construct;
+                    else
+                    { 
+                        // If it's not calling a global function or constructor,
+                        // then it's calling a member function. We'll validate the
+                        // local struct context later when we build the WASM.
+                        caller.astType = TokenASTType.CallMember;
+                    }
+
                     caller.evaluatingType = reslvFn.returnType;
                     return caller;
                 }
@@ -970,16 +897,7 @@ namespace PxPre.SynthSyn
                 TokenAST astSrc = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[1]);
                 EnsureTypeIsBitCompatible(astSrc.evaluatingType, node.nodes[1].root);
 
-                return new TokenAST(
-                    node.root, 
-                    this, 
-                    TokenASTType.Index, 
-                    null, 
-                    null, 
-                    true, 
-                    TokenAST.DataManifest.Procedural, 
-                    astSrc, 
-                    astKey);
+                return new TokenAST(node.root, this, TokenASTType.Index, null, null, true, TokenAST.DataManifest.Procedural, astSrc, astKey);
             }
 
             if (node.root.MatchesSymbol("+") == true)
@@ -987,16 +905,7 @@ namespace PxPre.SynthSyn
                 TokenAST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
 
-                return new TokenAST(
-                    node.root, 
-                    this, 
-                    TokenASTType.Add, 
-                    null, 
-                    left.evaluatingType, 
-                    false, 
-                    TokenAST.CombineManifests(left, right), 
-                    left, 
-                    right);
+                return new TokenAST(node.root, this, TokenASTType.Add, null, left.evaluatingType, false, TokenAST.CombineManifests(left, right), left, right);
             }
 
             if (node.root.MatchesSymbol("-") == true)
@@ -1500,7 +1409,7 @@ namespace PxPre.SynthSyn
 
                         ValueRef vrLeft = this.BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
 
-                        if(vrLeft.valLoc == ValueLoc.AddrLocal)
+                        if(vrLeft.valLoc == ValueLoc.LocalIdx)
                         { 
                             ValueRef vrRight = this.BuildBSFunctionExpression(fnd, expr.branches[1], wasmBuild, ctxBuilder, fnBuild);
                             vrRight.PutInstrinsicValueOnStack(fnBuild); // Currently only handling intrinsic values
@@ -1597,29 +1506,14 @@ namespace PxPre.SynthSyn
 
                         if(vr == null)
                             throw new SynthExceptionImpossible("Expected local variable wasn't found.");
-
                         
                         if(vr.valLoc == ValueLoc.ValueOnMemStack)
-                        {
-                            // Load the stack pointer at [0]
-                            fnBuild.Add_I32Const(0);
-                            fnBuild.Add_I32Load();
-
-                            // Load the offset of the variable from the
-                            // base of the stack (if needed)
-                            if(vr.fnByteAlign != 0)
-                            {
-                                fnBuild.Add_I32Const(vr.fnByteAlign);
-                                fnBuild.AddInstr(WASM.Instruction.i32_add);
-                            }
-
-                            return new ValueRef(ValueLoc.PointerOnStack, -1, -1, vr.varType, 1);
-                        }
+                            return vr.PutLocalVarAddressOnStack(fnBuild);
 
                         if (vr.varType.intrinsic == false)
                             throw new SynthExceptionCompile("Non intrinsic local variables not supported yet.");
 
-                        if (vr.valLoc != ValueLoc.AddrLocal)
+                        if (vr.valLoc != ValueLoc.LocalIdx)
                             throw new SynthExceptionCompile("Mem stack and heap variables not supported yet.");
 
                         //fnBuild.Add_LocalGet((uint)vr.idx);
@@ -1627,7 +1521,21 @@ namespace PxPre.SynthSyn
                     }
 
                 case TokenASTType.GetParamVar:
-                    break;
+                    { 
+                        SynthVarValue svvParam = fnd.GetParameter(expr.token.fragment);
+                        if(svvParam == null)
+                            throw new SynthExceptionImpossible("Could not find expected parameter.");
+
+                        ValueRef vr = fnd.parameterSet.GetRef(svvParam);
+                        if(vr == null)
+                            throw new SynthExceptionImpossible("Could not resolve reference to parameter.");
+
+                        if(vr.valLoc != ValueLoc.LocalIdx)
+                            throw new SynthExceptionCompile($"Unable to get parameter from {vr.valLoc}.");
+
+                        vr.PutInstrinsicValueOnStack(fnBuild);
+                        return new ValueRef(ValueLoc.ValueOnStack, -1, -1, vr.varType);
+                    }
 
                 case TokenASTType.GetFunction:
                     break;
@@ -1644,7 +1552,7 @@ namespace PxPre.SynthSyn
                         if(fnd.isStatic == true)
                             throw new SynthExceptionSyntax(expr.token, "Cannot get 'this' in global function.");
 
-                        if(fnd.paramList.Count == 0 || fnd.paramList[0].varLoc != SynthVarValue.VarLocation.ThisRef)
+                        if(fnd.parameterSet.HasThis() == false)
                             throw new SynthExceptionImpossible("Keyword 'this' unavailable.");
 
                         fnBuild.Add_LocalGet(0);
@@ -2149,13 +2057,23 @@ namespace PxPre.SynthSyn
                         // an initialization
                         if (expr.branches.Count > 1) 
                         {
+                            if(expr.branches[1].astType == TokenASTType.Construct)
+                            {
+                                if(vrReg.varType.intrinsic == true)
+                                    throw new SynthExceptionSyntax(expr.branches[1].token, "Cannot construct intrinsic type.");
 
-                            // This will put/calculate the evaluated intrinsic value on the stack.
-                            ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[1], wasmBuild, ctxBuilder, fnBuild);
-                            if(vr.varType.intrinsic == false)
-                                throw new SynthExceptionCompile("Initializing non-intrinsic variables on the stack is currently not supported.");
+                                //vrReg.PutInstrinsicValueOnStack(fnBuild)
+                                //expr.branches[1].
+                            }
+                            else
+                            {
+                                // This will put/calculate the evaluated intrinsic value on the stack.
+                                ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[1], wasmBuild, ctxBuilder, fnBuild);
+                                if(vr.varType.intrinsic == false)
+                                    throw new SynthExceptionCompile("Initializing non-intrinsic variables on the stack is currently not supported.");
 
-                            fnBuild.Add_LocalSet((uint)vrReg.idx);
+                                fnBuild.Add_LocalSet((uint)vrReg.idx);
+                            }
                         }
                         else if(vrReg.varType.intrinsic == false)
                         { 

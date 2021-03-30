@@ -212,7 +212,7 @@ namespace PxPre.SynthSyn
                 if(sfd.isConstructor == false)
                     continue;
 
-                if(sfd.paramList.Count != 1)
+                if(sfd.parameterSet.Count != 1)
                     continue;
 
                 // TODO: Runtime error checking/validation
