@@ -99,7 +99,7 @@ namespace PxPre.SynthSyn
                     continue;
                 }
 
-                SynthVarValue varParse = SynthVarValue.ParseBodyVar(this.declarationTokens, SynthVarValue.OuterScope.Local);
+                SynthVarValue varParse = SynthVarValue.ParseBodyVar(this.declarationTokens, SynthVarValue.OuterScope.Struct);
                 if(varParse != null)
                 { 
                     this.AddVariable(varParse);
@@ -199,6 +199,27 @@ namespace PxPre.SynthSyn
         public override SynthType_Struct GetStructScope()
         {
             return this;
+        }
+
+        public override SynthFuncDecl GetDefaultConstructor()
+        { 
+            List<SynthFuncDecl> lstFns;
+            if(this.functions.TryGetValue(this.typeName, out lstFns) == false)
+                return null;
+
+            foreach(SynthFuncDecl sfd in lstFns)
+            { 
+                if(sfd.isConstructor == false)
+                    continue;
+
+                if(sfd.paramList.Count != 1)
+                    continue;
+
+                // TODO: Runtime error checking/validation
+
+                return sfd;
+            }
+            return null;
         }
     }
 }

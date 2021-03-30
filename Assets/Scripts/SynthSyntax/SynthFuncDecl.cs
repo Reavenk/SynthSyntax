@@ -350,8 +350,21 @@ namespace PxPre.SynthSyn
             //
             //////////////////////////////////////////////////
 
-            // paramList
-            // paramLookup
+            if(this.isStatic == false)
+            { 
+                SynthType styThis = this.GetStructScope();
+                if(styThis == null)
+                    throw new SynthExceptionImpossible("No parent struct type to define 'this' for struct function.");
+
+                SynthVarValue svvThis = new SynthVarValue();
+                svvThis.type = styThis;
+                svvThis.typeName = styThis.typeName;
+                svvThis.varName = "this";
+                svvThis.varLoc = SynthVarValue.VarLocation.ThisRef;
+
+                this.paramList.Add(svvThis);
+                this.paramLookup.Add(svvThis.varName, svvThis);
+            }
 
             while(paramsPhrase.Count > 0) 
             { 
@@ -488,7 +501,10 @@ namespace PxPre.SynthSyn
             bool startedDefaultSection = false;
             foreach(SynthVarValue svv in this.paramList)
             { 
-                if(svv.declPhrase.Count < 2)
+                if(svv.varName == "this")
+                    continue;
+
+                if (svv.declPhrase.Count < 2)
                     throw new SynthExceptionImpossible($"Parameter {svv.varName} for function {this.functionName} found with less than 2 tokens.");
 
                 if(svv.declPhrase.Count > 2)

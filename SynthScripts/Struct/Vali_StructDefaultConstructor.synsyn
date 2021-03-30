@@ -1,0 +1,33 @@
+// 
+// 
+// >> Name: "Struct Default Constructor"
+// >> Results : {5, 6, 7}
+// 
+
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+struct TestStruct
+{
+	int a;
+	int b;
+	float c;
+	int8 d;
+	
+	TestStruct()
+	{
+		a = 5;
+		this.b = 6;
+		d = 7;
+	}
+}
+
+entry DoTest()
+{
+	TestStruct ts;
+	
+	LogTest(ts.a);
+	LogTest(ts.b);
+	LogTest(ts.d);
+}

@@ -287,17 +287,24 @@ namespace PxPre.SynthSyn
             // TODO: Consider removing the WASMSection class (in another file)
 
 
-            foreach (var kvp in this.rootContext.Functions)
-            {
-                List<SynthFuncDecl> lst = kvp.Value;
-                foreach (SynthFuncDecl sfd in lst)
-                {
-                    if (sfd.isExtern == true)
-                        continue;
+            foreach(FunctionInfo fi in this.functionInfos)
+            { 
+                if(fi.function.isExtern == true)
+                    continue;
 
-                    this.BuildFunction(sfd);
-                }
+                this.BuildFunction(fi.function);
             }
+            //foreach (var kvp in this.rootContext.Functions)
+            //{
+            //    List<SynthFuncDecl> lst = kvp.Value;
+            //    foreach (SynthFuncDecl sfd in lst)
+            //    {
+            //        if (sfd.isExtern == true)
+            //            continue;
+            //
+            //        this.BuildFunction(sfd);
+            //    }
+            //}
 
             //
             //      FUNCTION TYPE DECLARATIONS
@@ -550,8 +557,8 @@ namespace PxPre.SynthSyn
                 startFn.AddLEB128(0); // Local declarations
                 // Set the starting stack position (4) in memory. This is basically the stack position, but
                 // we reserve the first 4 bytes for the stack information.
-                startFn.Add_I32Const(4);
                 startFn.Add_I32Const(0);
+                startFn.Add_I32Const(4);
                 startFn.Add_I32Store();
                 startFn.Add_End();
                 //
@@ -726,7 +733,7 @@ namespace PxPre.SynthSyn
 
                 // These are really bytes, but they'll end up being added as bytes since they're
                 // small constants
-                fnBuild.AddLEB128((int)consolidatedLocalTys[i].Key); 
+                fnBuild.AddLEB128((uint)consolidatedLocalTys[i].Key); 
             }
 
             builder.BuildBSFunction(fnd, fnd.ast, this, builder, fnBuild);

@@ -324,13 +324,13 @@ namespace PxPre.SynthSyn
             for(int i = 0; i < this.locStkEle.Count; ++i)
             {
                 ValueRef vr = this.locStkEle[i];
-                vr.fnIdx += locMax;
+                vr.fnIdx = locMax + vr.idx;
             }
 
             for(int i = 0; i < this.memStkEle.Count; ++i)
             { 
                 ValueRef vr = this.memStkEle[i];
-                vr.fnByteAlign += memMax;
+                vr.fnByteAlign = memMax + vr.byteAlign;
             }
         }
 
@@ -740,8 +740,47 @@ namespace PxPre.SynthSyn
                 SynthVarValue svv = function.GetVar(node.root.fragment);
                 if(svv != null)
                 {
+                    if(svv.varLoc == SynthVarValue.VarLocation.Member)
+                    {
+                        TokenAST astSrc = new TokenAST(node.root, this, TokenASTType.GetThis, function.GetStructScope(), function.GetStructScope(), false, TokenAST.DataManifest.Procedural);
+                        TokenAST astDeref = new TokenAST(node.root, this, TokenASTType.DerefName, null, svv.type, false, TokenAST.DataManifest.Procedural);
+                        return new TokenAST(node.root, this, TokenASTType.GetMemberVar, svv, svv.type, true, TokenAST.DataManifest.Procedural, astSrc, astDeref);
+                    }
+                    else if(svv.varLoc == SynthVarValue.VarLocation.Parameter)
+                    {
+                        return new TokenAST(node.root, this, TokenASTType.GetParamVar, svv, svv.type, true, TokenAST.DataManifest.Procedural);
+                    }
+                    else if(svv.varLoc == SynthVarValue.VarLocation.Local)
+                    {
+                        return new TokenAST(node.root, this, TokenASTType.GetLocalVar, svv, svv.type, true, TokenAST.DataManifest.Procedural);
+                    }
+                    else if(svv.varLoc == SynthVarValue.VarLocation.Static)
+                    {
+                        return new TokenAST(node.root, this, TokenASTType.GetGlobalVar, svv, svv.type, true, TokenAST.DataManifest.Procedural);
+                    }
+                    //TokenAST astDeref =
+                    //new TokenAST(
+                    //    node.nodes[1].root,
+                    //    this,
+                    //    TokenASTType.DerefName,
+                    //    svv,
+                    //    svv.type,
+                    //    false,
+                    //    TokenAST.DataManifest.NoData);
+                    //
+                    //TokenAST astDeref =
+                    //    new TokenAST(
+                    //        node.nodes[1].root,
+                    //        this,
+                    //        TokenASTType.DerefName,
+                    //        svv,
+                    //        svv.type,
+                    //        false,
+                    //        TokenAST.DataManifest.NoData);
+                    //
+                    //if(svv.
                     // TODO: Check if we're in a function context.
-                    return new TokenAST(node.root, this, TokenASTType.GetMemberVar, svv, svv.type, true, TokenAST.DataManifest.Procedural);
+                    
                 }
 
                 SynthCanidateFunctions canFns = function.GetCanidateFunctions(node.root.fragment);
@@ -1583,7 +1622,7 @@ namespace PxPre.SynthSyn
                         if (vr.valLoc != ValueLoc.AddrLocal)
                             throw new SynthExceptionCompile("Mem stack and heap variables not supported yet.");
 
-                        fnBuild.Add_LocalGet((uint)vr.idx);
+                        //fnBuild.Add_LocalGet((uint)vr.idx);
                         return vr;
                     }
 
@@ -1597,7 +1636,21 @@ namespace PxPre.SynthSyn
                     break;
 
                 case TokenASTType.GetThis:
-                    break;
+                    {
+                        SynthType styThis = fnd.GetStructScope();
+                        if(styThis == null)
+                            throw new SynthExceptionSyntax(expr.token, "Illegal scope for use of 'this' keyword.");
+
+                        if(fnd.isStatic == true)
+                            throw new SynthExceptionSyntax(expr.token, "Cannot get 'this' in global function.");
+
+                        if(fnd.paramList.Count == 0 || fnd.paramList[0].varLoc != SynthVarValue.VarLocation.ThisRef)
+                            throw new SynthExceptionImpossible("Keyword 'this' unavailable.");
+
+                        fnBuild.Add_LocalGet(0);
+
+                        return new ValueRef(ValueLoc.PointerOnStack, -1, -1, styThis, 1);
+                    }
 
                 case TokenASTType.FunctionDecl:
                     break;
@@ -1654,7 +1707,10 @@ namespace PxPre.SynthSyn
 
                         // TODO: If these are addresses, get the address
                         ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
+                        vrLeft.PutInstrinsicValueOnStack(fnBuild);
+
                         ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
+                        vrRight.PutInstrinsicValueOnStack(fnBuild);
 
                         ctxBuilder.PopType(left.evaluatingType);
                         ctxBuilder.PopType(right.evaluatingType);
@@ -1694,10 +1750,11 @@ namespace PxPre.SynthSyn
                         TokenAST left = expr.branches[0];
                         TokenAST right = expr.branches[1];
 
-                        // TODO: If these are addresses, get the address
                         ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
+                        vrLeft.PutInstrinsicValueOnStack(fnBuild);
 
                         ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
+                        vrRight.PutInstrinsicValueOnStack(fnBuild);
 
                         ctxBuilder.PopType(left.evaluatingType);
                         ctxBuilder.PopType(right.evaluatingType);
@@ -1737,10 +1794,11 @@ namespace PxPre.SynthSyn
                         TokenAST left = expr.branches[0];
                         TokenAST right = expr.branches[1];
 
-                        // TODO: If these are addresses, get the address
                         ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
+                        vrLeft.PutInstrinsicValueOnStack(fnBuild);
 
                         ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
+                        vrRight.PutInstrinsicValueOnStack(fnBuild);
 
                         ctxBuilder.PopType(left.evaluatingType);
                         ctxBuilder.PopType(right.evaluatingType);
@@ -1780,9 +1838,11 @@ namespace PxPre.SynthSyn
                         TokenAST left = expr.branches[0];
                         TokenAST right = expr.branches[1];
 
-                        // TODO: If these are addresses, get the address
                         ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
+                        vrLeft.PutInstrinsicValueOnStack(fnBuild);
+
                         ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
+                        vrRight.PutInstrinsicValueOnStack(fnBuild);
 
                         ctxBuilder.PopType(left.evaluatingType);
                         ctxBuilder.PopType(right.evaluatingType);
@@ -1828,9 +1888,11 @@ namespace PxPre.SynthSyn
                         TokenAST left = expr.branches[0];
                         TokenAST right = expr.branches[1];
 
-                        // TODO: If these are addresses, get the address
                         ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
+                        vrLeft.PutInstrinsicValueOnStack(fnBuild);
+
                         ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
+                        vrRight.PutInstrinsicValueOnStack(fnBuild);
 
                         ctxBuilder.PopType(left.evaluatingType);
                         ctxBuilder.PopType(right.evaluatingType);
@@ -1910,7 +1972,10 @@ namespace PxPre.SynthSyn
                             match32.Contains(right.evaluatingType.typeName) == true)
                         {
                             ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
+                            vrLeft.PutInstrinsicValueOnStack(fnBuild);
+
                             ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
+                            vrRight.PutInstrinsicValueOnStack(fnBuild);
 
                             fnBuild.AddInstr(instr32);
                             return new ValueRef(ValueLoc.ValueOnStack, -1, -1, fnd.GetType("int"));
@@ -1920,7 +1985,10 @@ namespace PxPre.SynthSyn
                             match64.Contains(right.evaluatingType.typeName) == true)
                         {
                             ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
+                            vrLeft.PutInstrinsicValueOnStack(fnBuild);
+
                             ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
+                            vrRight.PutInstrinsicValueOnStack(fnBuild);
 
                             fnBuild.AddInstr(instr64);
                             return new ValueRef(ValueLoc.ValueOnStack, -1, -1, fnd.GetType("int64"));
@@ -1944,6 +2012,7 @@ namespace PxPre.SynthSyn
                         if (match32.Contains(astVal.evaluatingType.typeName) == true)
                         {
                             ValueRef vrVal = BuildBSFunctionExpression(fnd, astVal, wasmBuild, ctxBuilder, fnBuild);
+                            vrVal.PutInstrinsicValueOnStack(fnBuild);
 
                             fnBuild.Add_I32Const(-1);
                             fnBuild.AddInstr(WASM.Instruction.i32_xor);
@@ -1951,6 +2020,7 @@ namespace PxPre.SynthSyn
                         else if(match64.Contains(astVal.evaluatingType.typeName) == true)
                         {
                             ValueRef vrVal = BuildBSFunctionExpression(fnd, astVal, wasmBuild, ctxBuilder, fnBuild);
+                            vrVal.PutInstrinsicValueOnStack(fnBuild);
 
                             fnBuild.Add_I64Const(-1);
                             fnBuild.AddInstr(WASM.Instruction.i64_xor);
@@ -1976,7 +2046,10 @@ namespace PxPre.SynthSyn
                             match32.Contains(right.evaluatingType.typeName) == true)
                         {
                             ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
+                            vrLeft.PutInstrinsicValueOnStack(fnBuild);
+
                             ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
+                            vrRight.PutInstrinsicValueOnStack(fnBuild);
 
                             fnBuild.AddInstr(WASM.Instruction.i32_shl);
                             return new ValueRef(ValueLoc.ValueOnStack, -1, -1, fnd.GetType("int"));
@@ -1986,7 +2059,10 @@ namespace PxPre.SynthSyn
                             match64.Contains(right.evaluatingType.typeName) == true)
                         {
                             ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
+                            vrLeft.PutInstrinsicValueOnStack(fnBuild);
+
                             ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
+                            vrRight.PutInstrinsicValueOnStack(fnBuild);
 
                             fnBuild.AddInstr(WASM.Instruction.i64_shl);
                             return new ValueRef(ValueLoc.ValueOnStack, -1, -1, fnd.GetType("int64"));
@@ -2013,7 +2089,10 @@ namespace PxPre.SynthSyn
                             match32.Contains(right.evaluatingType.typeName) == true)
                         {
                             ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
+                            vrLeft.PutInstrinsicValueOnStack(fnBuild);
+
                             ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
+                            vrRight.PutInstrinsicValueOnStack(fnBuild);
 
                             // TODO: More work needs to be done to figure out casting of lower unsigned values
                             switch(right.evaluatingType.typeName)
@@ -2038,7 +2117,10 @@ namespace PxPre.SynthSyn
                             match64.Contains(right.evaluatingType.typeName) == true)
                         {
                             ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
+                            vrLeft.PutInstrinsicValueOnStack(fnBuild);
+
                             ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
+                            vrRight.PutInstrinsicValueOnStack(fnBuild);
 
                             if(right.evaluatingType.typeName == "int64")
                                 fnBuild.AddInstr(WASM.Instruction.i64_shr_s);
@@ -2074,6 +2156,19 @@ namespace PxPre.SynthSyn
                                 throw new SynthExceptionCompile("Initializing non-intrinsic variables on the stack is currently not supported.");
 
                             fnBuild.Add_LocalSet((uint)vrReg.idx);
+                        }
+                        else if(vrReg.varType.intrinsic == false)
+                        { 
+                            SynthFuncDecl sfDefcon = vrReg.varType.GetDefaultConstructor();
+
+                            if(sfDefcon != null)
+                            {
+                                WASMBuild.FunctionInfo fi = wasmBuild.functionLookup[sfDefcon];
+
+                                fnBuild.Add_I32Const(vrReg.fnByteAlign);
+                                fnBuild.Add_I32Load();
+                                fnBuild.Add_Call(fi.functionIndex);
+                            }
                         }
                         return new ValueRef(ValueLoc.NoValue, 0, 0, vrReg.varType);
                     }
@@ -2154,6 +2249,8 @@ namespace PxPre.SynthSyn
                 case TokenASTType.UIntToFloat:
                     {
                         ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
+                        vr.PutInstrinsicValueOnStack(fnBuild);
+
                         fnBuild.AddInstr(WASM.Instruction.f32_convert_i32_u);
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
@@ -2161,6 +2258,8 @@ namespace PxPre.SynthSyn
                 case TokenASTType.UIntToDouble:
                     {
                         ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
+                        vr.PutInstrinsicValueOnStack(fnBuild);
+
                         fnBuild.AddInstr(WASM.Instruction.f64_convert_i32_u);
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
@@ -2168,6 +2267,8 @@ namespace PxPre.SynthSyn
                 case TokenASTType.UIntToUInt64:
                     {
                         ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
+                        vr.PutInstrinsicValueOnStack(fnBuild);
+
                         fnBuild.AddInstr(WASM.Instruction.i64_extend_i32_u);
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
@@ -2175,6 +2276,8 @@ namespace PxPre.SynthSyn
                 case TokenASTType.SIntToSInt64:
                     {
                         ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
+                        vr.PutInstrinsicValueOnStack(fnBuild);
+
                         fnBuild.AddInstr(WASM.Instruction.i64_extend_i32_s);
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
@@ -2182,6 +2285,8 @@ namespace PxPre.SynthSyn
                 case TokenASTType.FloatToUInt:
                     {
                         ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
+                        vr.PutInstrinsicValueOnStack(fnBuild);
+
                         ctxBuilder.PopType(expr.branches[0].evaluatingType);
                         ctxBuilder.PushType(expr.evaluatingType);
                         fnBuild.AddInstr(WASM.Instruction.i32_trunc_f32_u);
@@ -2319,7 +2424,9 @@ namespace PxPre.SynthSyn
                         if(vr.valLoc != ValueLoc.ValueOnStack)
                             throw new SynthExceptionCompile("Only stack conversions are currently allowed.");
 
-                        switch(vr.varType.typeName)
+                        vr.PutInstrinsicValueOnStack(fnBuild);
+
+                        switch (vr.varType.typeName)
                         { 
                             case "float":
                                 return vr;
@@ -2390,7 +2497,10 @@ namespace PxPre.SynthSyn
                     { 
                         for(int i = 0; i < expr.branches.Count; ++i)
                         {
-                            BuildBSFunctionExpression(fnd, expr.branches[i], wasmBuild, ctxBuilder, fnBuild);
+                            ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[i], wasmBuild, ctxBuilder, fnBuild);
+
+                            if(vr.varType.intrinsic == true)
+                                vr.PutInstrinsicValueOnStack(fnBuild);
                         }
 
                         if(expr.synthObj == null)
@@ -2427,7 +2537,9 @@ namespace PxPre.SynthSyn
                             throw new SynthExceptionImpossible("Negate encountered with unexpected AST branches.");
 
                         ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
-                        switch(vr.varType.typeName)
+                        vr.PutInstrinsicValueOnStack(fnBuild);
+
+                        switch (vr.varType.typeName)
                         { 
                             case "int8":
                             case "uint8":

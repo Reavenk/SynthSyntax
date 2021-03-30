@@ -79,6 +79,12 @@ namespace PxPre.SynthSyn
             this.bin.AddRange(ie);
         }
 
+        public void Add_Call(uint idx)
+        { 
+            this.AddInstr(WASM.Instruction.call);
+            this.AddLEB128(idx);
+        }
+
         public void Add_End()
         {
             this.AddInstr(WASM.Instruction.end);

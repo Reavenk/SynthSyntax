@@ -148,7 +148,7 @@ namespace PxPre.SynthSyn
 
         public void AddVariable(SynthVarValue var)
         {
-            if(var.isGlobal == true)
+            if(var.varLoc == SynthVarValue.VarLocation.Static)
                 this.AddGlobalVar(var);
             else
                 this.AddLocalVariable(var);
@@ -156,12 +156,12 @@ namespace PxPre.SynthSyn
 
         public SynthVarValue AddLocalVariable(string varName, SynthType ty)
         {
-            return this.AddVariable(varName, ty, VarDst.Local);
+            return this.AddVariable(varName, ty, VarDst.Local, SynthVarValue.VarLocation.Local);
         }
 
         public SynthVarValue AddLocalVariable(string varName, string tyName)
         {
-            return this.AddVariable(varName, tyName, VarDst.Local);
+            return this.AddVariable(varName, tyName, VarDst.Local, SynthVarValue.VarLocation.Local);
         }
 
         public void AddLocalVariable(SynthVarValue var)
@@ -171,12 +171,12 @@ namespace PxPre.SynthSyn
 
         public SynthVarValue AddGlobalVar(string varName, SynthType ty)
         {
-            return this.AddVariable(varName, ty, VarDst.Global);
+            return this.AddVariable(varName, ty, VarDst.Global, SynthVarValue.VarLocation.Static);
         }
 
         public SynthVarValue AddGlobalVar(string varName, string tyName)
         {
-            return this.AddVariable(varName, tyName, VarDst.Global);
+            return this.AddVariable(varName, tyName, VarDst.Global, SynthVarValue.VarLocation.Static);
         }
 
         public void AddGlobalVar(SynthVarValue var)
@@ -184,10 +184,10 @@ namespace PxPre.SynthSyn
             this.AddVariable(var, VarDst.Global);
         }
 
-        public SynthVarValue AddVariable(string varName, SynthType ty, VarDst dst)
+        public SynthVarValue AddVariable(string varName, SynthType ty, VarDst dst, SynthVarValue.VarLocation varLoc)
         {
             SynthVarValue newVar = new SynthVarValue();
-            newVar.isSynthParam = false;
+            newVar.varLoc = varLoc;
             newVar.varName = varName;
             newVar.typeName = ty.typeName;
             newVar.type = ty;
@@ -196,10 +196,10 @@ namespace PxPre.SynthSyn
             return newVar;
         }
 
-        public SynthVarValue AddVariable(string varName, string tyName, VarDst dst)
+        public SynthVarValue AddVariable(string varName, string tyName, VarDst dst, SynthVarValue.VarLocation varLoc)
         {
             SynthVarValue newVar = new SynthVarValue();
-            newVar.isSynthParam = false;
+            newVar.varLoc = varLoc;
             newVar.varName = varName;
             newVar.typeName = tyName;
 

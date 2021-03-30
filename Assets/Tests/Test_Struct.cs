@@ -11,9 +11,9 @@ namespace Tests
         }
 
         [Test]
-        public void Test_StructConstructor()
+        public void Test_StructDefaultConstructor()
         {
-            UnitTest_Utils.PerformContainedTest("SynthScripts/Struct/Vali_StructConstructor.synsyn");
+            UnitTest_Utils.PerformContainedTest("SynthScripts/Struct/Vali_StructDefaultConstructor.synsyn");
         }
 
         [Test]

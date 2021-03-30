@@ -28,6 +28,11 @@ namespace PxPre.SynthSyn
         {
             return this;
         }
+
+        public virtual SynthFuncDecl GetDefaultConstructor()
+        { 
+            return null;
+        }
     }
 
 

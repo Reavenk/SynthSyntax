@@ -194,7 +194,7 @@ namespace PxPre.SynthSyn
             SynthVarValue newParam = new SynthVarValue();
             newParam.typeName = typename;
             newParam.varName = varname;
-            newParam.isSynthParam = true;
+            newParam.varLoc = SynthVarValue.VarLocation.Parameter;
 
             idx = 3;
             if(tokens[idx].Matches(TokenType.tySymbol, "=") == true)

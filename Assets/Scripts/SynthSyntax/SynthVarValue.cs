@@ -26,8 +26,18 @@ namespace PxPre.SynthSyn
             /// Depending on how this is used, it can mean either the local parameter, or 
             /// for parsing class methods.
             /// </summary>
-            Local,
+            Function,
+            Struct,
             Parameter
+        }
+
+        public enum VarLocation
+        {
+            Static,
+            Parameter,
+            Local,
+            Member,
+            ThisRef
         }
 
         public string varName;
@@ -35,10 +45,8 @@ namespace PxPre.SynthSyn
         public string typeName;
         public SynthType type;
 
-        /// <summary>
-        /// If true, the SynthVarValue represents a param global.
-        /// </summary>
-        public bool isSynthParam;
+        public VarLocation varLoc;
+
         public List<Token> declPhrase;
         public int declBaseEnd = -1; // Where does the base declaraction end?
 
@@ -53,8 +61,6 @@ namespace PxPre.SynthSyn
         // If the variable is initialized inline - what are the values initialized to. If the variable
         // doesn't have any member (is an intrinsic) then use the string key "this".
         public Dictionary<string, SynthVarValue> childrenValues;
-
-        public bool isGlobal = false;
 
         /// <summary>
         /// Given a set of tokens, parse the data of a variable declaration, with a 
@@ -134,7 +140,17 @@ namespace PxPre.SynthSyn
             tokens.RemoveRange(0, idx);
             ret.dataType        = dataType;
             ret.declBaseEnd     = baseEnd;
-            ret.isGlobal        = scope == OuterScope.Global;
+
+            if(scope == OuterScope.Global)
+                ret.varLoc = VarLocation.Static;
+            else if(scope == OuterScope.Function)
+                ret.varLoc = VarLocation.Local;
+            else if(scope == OuterScope.Struct)
+                ret.varLoc = VarLocation.Member;
+            else if(scope == OuterScope.Parameter)
+                ret.varLoc = VarLocation.Parameter;
+            else
+                throw new SynthExceptionImpossible("Unexpected variable location.");
 
             return ret;
         }
@@ -177,7 +193,7 @@ namespace PxPre.SynthSyn
             if(ret.dataType != VarValueDataType.Value)
                 throw new SynthExceptionSyntax(line, "Param cannot be a pointer or reference.");
 
-            ret.isSynthParam = true;
+            ret.varLoc = VarLocation.Parameter;
 
             return ret;
         }

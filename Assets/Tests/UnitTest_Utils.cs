@@ -60,10 +60,6 @@ public static class UnitTest_Utils
             }
         }
 
-        
-
-
-
         ec.importData.SetFunction(
             "ImportedFns",
             "EndTest",
@@ -110,6 +106,7 @@ public static class UnitTest_Utils
             ExecutionContext exc = new ExecutionContext(mod, true);
 
             SetupTestingContext(exc);
+
             TestResults tr = StartTest();
             exc.RunFunction(mod.GetExportedFunction("DoTest"));
 
