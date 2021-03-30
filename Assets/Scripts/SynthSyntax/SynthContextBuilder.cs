@@ -99,7 +99,7 @@ namespace PxPre.SynthSyn
                 this.pointerAmt = pointerAmt;
             }
 
-            public void PutInstrinsicValueOnStack(List<byte> lstfnBin)
+            public void PutInstrinsicValueOnStack(WASMByteBuilder fnBuild)
             { 
                 if(this.varType.intrinsic == false)
                     throw new SynthExceptionImpossible("Attempting to get the value of a non-intrinsic type for an intrinsic operation.");
@@ -123,8 +123,7 @@ namespace PxPre.SynthSyn
                         case "uint64":
                         case "float":
                         case "double":
-                            lstfnBin.Add((byte)WASM.Instruction.local_get);
-                            lstfnBin.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)this.fnIdx));
+                            fnBuild.Add_LocalGet((uint)this.fnIdx);
                             break;
 
                         default:
@@ -139,53 +138,32 @@ namespace PxPre.SynthSyn
                 switch(this.varType.typeName)
                 {
                 case "int8":
-                    lstfnBin.Add((byte)WASM.Instruction.i32_load8_s);
-                    lstfnBin.Add(0);
-                    lstfnBin.Add(0);
+                    fnBuild.Add_I32Load8_s();
                     break;
-
                 case "uint8":
-                    lstfnBin.Add((byte)WASM.Instruction.i32_load8_u);
-                    lstfnBin.Add(0);
-                    lstfnBin.Add(0);
+                    fnBuild.Add_I32Load8_u();
                     break;
-
                 case "int16":
-                    lstfnBin.Add((byte)WASM.Instruction.i32_load16_s);
-                    lstfnBin.Add(0);
-                    lstfnBin.Add(0);
+                    fnBuild.Add_I32Load16_s();
                     break;
-
                 case "uint16":
-                    lstfnBin.Add((byte)WASM.Instruction.i32_load16_u);
-                    lstfnBin.Add(0);
-                    lstfnBin.Add(0);
+                    fnBuild.Add_I32Load16_u();
                     break;
-
                 case "int":
                 case "uint":
-                    lstfnBin.Add((byte)WASM.Instruction.i32_load);
-                    lstfnBin.Add(0);
-                    lstfnBin.Add(0);
+                    fnBuild.Add_I32Load();
                     break;
-
                 case "int64":
                 case "uint64":
-                    lstfnBin.Add((byte)WASM.Instruction.i64_load);
-                    lstfnBin.Add(0);
-                    lstfnBin.Add(0);
+                    fnBuild.Add_I64Load();
                     break;
 
                 case "float":
-                    lstfnBin.Add((byte)WASM.Instruction.f32_load);
-                    lstfnBin.Add(0);
-                    lstfnBin.Add(0);
+                    fnBuild.Add_F32Load();
                     break;
 
                 case "double":
-                    lstfnBin.Add((byte)WASM.Instruction.f64_load);
-                    lstfnBin.Add(0);
-                    lstfnBin.Add(0);
+                    fnBuild.Add_F64Load();
                     break;
 
                 default:
@@ -1461,18 +1439,18 @@ namespace PxPre.SynthSyn
         { 
         }
 
-        public void BuildBSFunction( SynthFuncDecl fnd, TokenAST ast, WASMBuild wasmBuild, SynthContextBuilder ctxBuilder, List<byte> fnbc)
+        public void BuildBSFunction( SynthFuncDecl fnd, TokenAST ast, WASMBuild wasmBuild, SynthContextBuilder ctxBuilder, WASMByteBuilder fnBuild)
         { 
 
             foreach(TokenAST n in ast.branches)
             { 
-                this.BuildBSFunctionExpression(fnd, n, wasmBuild, ctxBuilder, fnbc);
+                this.BuildBSFunctionExpression(fnd, n, wasmBuild, ctxBuilder, fnBuild);
             }
         }
 
         static HashSet<string> match32 = new HashSet<string> { "int8", "uint8", "int16", "uint16", "int", "uint" };
         static HashSet<string> match64 = new HashSet<string> { "int64", "uint64" };
-        public ValueRef BuildBSFunctionExpression(SynthFuncDecl fnd, TokenAST expr, WASMBuild wasmBuild, SynthContextBuilder ctxBuilder, List<byte> fnbc)
+        public ValueRef BuildBSFunctionExpression(SynthFuncDecl fnd, TokenAST expr, WASMBuild wasmBuild, SynthContextBuilder ctxBuilder, WASMByteBuilder fnBuild)
         { 
             switch(expr.astType)
             {
@@ -1481,22 +1459,20 @@ namespace PxPre.SynthSyn
                         if(expr.branches.Count != 2)
                             throw new SynthExceptionCompile("Setting a value expected two parameters, a target and a destination.");
 
-                        ValueRef vrLeft = this.BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnbc);
+                        ValueRef vrLeft = this.BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
 
                         if(vrLeft.valLoc == ValueLoc.AddrLocal)
                         { 
-                            ValueRef vrRight = this.BuildBSFunctionExpression(fnd, expr.branches[1], wasmBuild, ctxBuilder, fnbc);
-                            vrRight.PutInstrinsicValueOnStack(fnbc); // Currently only handling intrinsic values
+                            ValueRef vrRight = this.BuildBSFunctionExpression(fnd, expr.branches[1], wasmBuild, ctxBuilder, fnBuild);
+                            vrRight.PutInstrinsicValueOnStack(fnBuild); // Currently only handling intrinsic values
 
-                            fnbc.Add((byte)WASM.Instruction.local_set);
-                            fnbc.AddRange(WASM.BinParse.EncodeSignedLEB((uint)vrLeft.idx));
-
+                            fnBuild.Add_LocalSet((uint)vrLeft.idx);
                             return new ValueRef(ValueLoc.NoValue, -1, -1, vrLeft.varType);
                         }
                         else if(vrLeft.valLoc == ValueLoc.PointerOnStack)
                         {
-                            ValueRef vrRight = this.BuildBSFunctionExpression(fnd, expr.branches[1], wasmBuild, ctxBuilder, fnbc);
-                            vrRight.PutInstrinsicValueOnStack(fnbc); // Currently only handling intrinsic values
+                            ValueRef vrRight = this.BuildBSFunctionExpression(fnd, expr.branches[1], wasmBuild, ctxBuilder, fnBuild);
+                            vrRight.PutInstrinsicValueOnStack(fnBuild); // Currently only handling intrinsic values
 
                             // Evaluating the left puts the pointer on the stack
                             // Then we put the value on the stack
@@ -1508,42 +1484,30 @@ namespace PxPre.SynthSyn
                             case "bool":
                             case "int8":
                             case "uint8":
-                                fnbc.Add((byte)WASM.Instruction.i32_store8);
-                                fnbc.Add(0);
-                                fnbc.Add(0);
+                                fnBuild.Add_I32Store8();
                                 break;
 
                             case "int16":
                             case "uint16":
-                                fnbc.Add((byte)WASM.Instruction.i32_store16);
-                                fnbc.Add(0);
-                                fnbc.Add(0);
+                                fnBuild.Add_I32Store16();
                                 break;
 
                             case "int":
                             case "uint":
-                                fnbc.Add((byte)WASM.Instruction.i32_store);
-                                fnbc.Add(0);
-                                fnbc.Add(0);
+                                fnBuild.Add_I32Store();
                                 break;
 
                             case "int64":
                             case "uint64":
-                                fnbc.Add((byte)WASM.Instruction.i64_store);
-                                fnbc.Add(0);
-                                fnbc.Add(0);
+                                fnBuild.Add_I64Store();
                                 break;
 
                             case "float":
-                                fnbc.Add((byte)WASM.Instruction.f32_store);
-                                fnbc.Add(0);
-                                fnbc.Add(0);
+                                fnBuild.Add_F32Store();
                                 break;
 
                             case "float64":
-                                fnbc.Add((byte)WASM.Instruction.f64_store);
-                                fnbc.Add(0);
-                                fnbc.Add(0);
+                                fnBuild.Add_F64Store();
                                 break;
 
                             default:
@@ -1565,7 +1529,7 @@ namespace PxPre.SynthSyn
                             throw new SynthExceptionImpossible("Getting member with an unexpected number of branches.");
 
                         // Get the base object (pointer to it)
-                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnbc);
+                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
 
                         if(expr.branches[1].token.Matches(TokenType.tyWord) == false)
                             throw new SynthExceptionSyntax(expr.branches[0].token, "Member name has unexpected syntax.");
@@ -1579,9 +1543,8 @@ namespace PxPre.SynthSyn
 
                             if(svv.alignmentOffset != 0)
                             {
-                                fnbc.Add((byte)WASM.Instruction.i32_const);
-                                fnbc.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)svv.alignmentOffset));
-                                fnbc.Add((byte)WASM.Instruction.i32_add);
+                                fnBuild.Add_I32Const((uint)svv.alignmentOffset);
+                                fnBuild.AddInstr(WASM.Instruction.i32_add);
                             }
                             return new ValueRef(ValueLoc.PointerOnStack, -1, -1, svv.type, 1);
                         }
@@ -1600,19 +1563,15 @@ namespace PxPre.SynthSyn
                         if(vr.valLoc == ValueLoc.ValueOnMemStack)
                         {
                             // Load the stack pointer at [0]
-                            fnbc.Add((byte)WASM.Instruction.i32_const);
-                            fnbc.Add(0);
-                            fnbc.Add((byte)WASM.Instruction.i32_load);
-                            fnbc.Add(0);
-                            fnbc.Add(0);
+                            fnBuild.Add_I32Const(0);
+                            fnBuild.Add_I32Load();
 
                             // Load the offset of the variable from the
                             // base of the stack (if needed)
                             if(vr.fnByteAlign != 0)
                             {
-                                fnbc.Add((byte)WASM.Instruction.i32_const);
-                                fnbc.AddRange(WASM.BinParse.EncodeSignedLEB(vr.fnByteAlign));
-                                fnbc.Add((byte)WASM.Instruction.i32_add);
+                                fnBuild.Add_I32Const(vr.fnByteAlign);
+                                fnBuild.AddInstr(WASM.Instruction.i32_add);
                             }
 
                             return new ValueRef(ValueLoc.PointerOnStack, -1, -1, vr.varType, 1);
@@ -1623,10 +1582,8 @@ namespace PxPre.SynthSyn
 
                         if (vr.valLoc != ValueLoc.AddrLocal)
                             throw new SynthExceptionCompile("Mem stack and heap variables not supported yet.");
-                        
-                        fnbc.Add((byte)WASM.Instruction.local_get);
-                        fnbc.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)vr.idx));
 
+                        fnBuild.Add_LocalGet((uint)vr.idx);
                         return vr;
                     }
 
@@ -1696,8 +1653,8 @@ namespace PxPre.SynthSyn
                         TokenAST right = expr.branches[1];
 
                         // TODO: If these are addresses, get the address
-                        ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnbc);
-                        ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnbc);
+                        ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
+                        ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
 
                         ctxBuilder.PopType(left.evaluatingType);
                         ctxBuilder.PopType(right.evaluatingType);
@@ -1709,20 +1666,20 @@ namespace PxPre.SynthSyn
                             case "uint16":
                             case "int":
                             case "uint":
-                                fnbc.Add( (byte)WASM.Instruction.i32_add);
+                                fnBuild.AddInstr(WASM.Instruction.i32_add);
                                 break;
 
                             case "int64":
                             case "uint64":
-                                fnbc.Add((byte)WASM.Instruction.i64_add);
+                                fnBuild.AddInstr(WASM.Instruction.i64_add);
                                 break;
 
                             case "float":
-                                fnbc.Add((byte)WASM.Instruction.f32_add);
+                                fnBuild.AddInstr(WASM.Instruction.f32_add);
                                 break;
 
                             case "float64":
-                                fnbc.Add((byte)WASM.Instruction.f64_add);
+                                fnBuild.AddInstr(WASM.Instruction.f64_add);
                                 break;
 
                             default:
@@ -1738,10 +1695,9 @@ namespace PxPre.SynthSyn
                         TokenAST right = expr.branches[1];
 
                         // TODO: If these are addresses, get the address
-                        ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnbc);
+                        ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
 
-
-                        ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnbc);
+                        ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
 
                         ctxBuilder.PopType(left.evaluatingType);
                         ctxBuilder.PopType(right.evaluatingType);
@@ -1753,20 +1709,20 @@ namespace PxPre.SynthSyn
                             case "uint16":
                             case "int":
                             case "uint":
-                                fnbc.Add((byte)WASM.Instruction.i32_sub);
+                                fnBuild.AddInstr(WASM.Instruction.i32_sub);
                                 break;
 
                             case "int64":
                             case "uint64":
-                                fnbc.Add((byte)WASM.Instruction.i64_sub);
+                                fnBuild.AddInstr(WASM.Instruction.i64_sub);
                                 break;
 
                             case "float":
-                                fnbc.Add((byte)WASM.Instruction.f32_sub);
+                                fnBuild.AddInstr(WASM.Instruction.f32_sub);
                                 break;
 
                             case "float64":
-                                fnbc.Add((byte)WASM.Instruction.f64_sub);
+                                fnBuild.AddInstr(WASM.Instruction.f64_sub);
                                 break;
 
                             default:
@@ -1782,10 +1738,9 @@ namespace PxPre.SynthSyn
                         TokenAST right = expr.branches[1];
 
                         // TODO: If these are addresses, get the address
-                        ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnbc);
+                        ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
 
-
-                        ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnbc);
+                        ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
 
                         ctxBuilder.PopType(left.evaluatingType);
                         ctxBuilder.PopType(right.evaluatingType);
@@ -1797,20 +1752,20 @@ namespace PxPre.SynthSyn
                             case "uint16":
                             case "int":
                             case "uint":
-                                fnbc.Add((byte)WASM.Instruction.i32_mul);
+                                fnBuild.AddInstr(WASM.Instruction.i32_mul);
                                 break;
 
                             case "int64":
                             case "uint64":
-                                fnbc.Add((byte)WASM.Instruction.i64_mul);
+                                fnBuild.AddInstr(WASM.Instruction.i64_mul);
                                 break;
 
                             case "float":
-                                fnbc.Add((byte)WASM.Instruction.f32_mul);
+                                fnBuild.AddInstr(WASM.Instruction.f32_mul);
                                 break;
 
                             case "float64":
-                                fnbc.Add((byte)WASM.Instruction.f64_mul);
+                                fnBuild.AddInstr(WASM.Instruction.f64_mul);
                                 break;
 
                             default:
@@ -1826,8 +1781,8 @@ namespace PxPre.SynthSyn
                         TokenAST right = expr.branches[1];
 
                         // TODO: If these are addresses, get the address
-                        ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnbc);
-                        ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnbc);
+                        ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
+                        ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
 
                         ctxBuilder.PopType(left.evaluatingType);
                         ctxBuilder.PopType(right.evaluatingType);
@@ -1836,29 +1791,29 @@ namespace PxPre.SynthSyn
                             case "int8":
                             case "int":
                             case "int16":
-                                fnbc.Add((byte)WASM.Instruction.i32_div_s);
+                                fnBuild.AddInstr(WASM.Instruction.i32_div_s);
                                 break;
 
                             case "uint8":
                             case "uint16":
                             case "uint":
-                                fnbc.Add((byte)WASM.Instruction.i32_div_u);
+                                fnBuild.AddInstr(WASM.Instruction.i32_div_u);
                                 break;
 
                             case "int64":
-                                fnbc.Add((byte)WASM.Instruction.i64_div_s);
+                                fnBuild.AddInstr(WASM.Instruction.i64_div_s);
                                 break;
 
                             case "uint64":
-                                fnbc.Add((byte)WASM.Instruction.i64_div_u);
+                                fnBuild.AddInstr(WASM.Instruction.i64_div_u);
                                 break;
 
                             case "float":
-                                fnbc.Add((byte)WASM.Instruction.f32_div);
+                                fnBuild.AddInstr(WASM.Instruction.f32_div);
                                 break;
 
                             case "float64":
-                                fnbc.Add((byte)WASM.Instruction.f64_div);
+                                fnBuild.AddInstr(WASM.Instruction.f64_div);
                                 break;
 
                             default:
@@ -1874,8 +1829,8 @@ namespace PxPre.SynthSyn
                         TokenAST right = expr.branches[1];
 
                         // TODO: If these are addresses, get the address
-                        ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnbc);
-                        ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnbc);
+                        ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
+                        ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
 
                         ctxBuilder.PopType(left.evaluatingType);
                         ctxBuilder.PopType(right.evaluatingType);
@@ -1884,21 +1839,21 @@ namespace PxPre.SynthSyn
                             case "int8":
                             case "int":
                             case "int16":
-                                fnbc.Add((byte)WASM.Instruction.i32_rem_s);
+                                fnBuild.AddInstr(WASM.Instruction.i32_rem_s);
                                 break;
 
                             case "uint8":
                             case "uint16":
                             case "uint":
-                                fnbc.Add((byte)WASM.Instruction.i32_rem_u);
+                                fnBuild.AddInstr(WASM.Instruction.i32_rem_u);
                                 break;
 
                             case "int64":
-                                fnbc.Add((byte)WASM.Instruction.i64_rem_s);
+                                fnBuild.AddInstr(WASM.Instruction.i64_rem_s);
                                 break;
 
                             case "uint64":
-                                fnbc.Add((byte)WASM.Instruction.i64_rem_u);
+                                fnBuild.AddInstr(WASM.Instruction.i64_rem_u);
                                 break;
 
                             case "float":
@@ -1954,20 +1909,20 @@ namespace PxPre.SynthSyn
                             match32.Contains(left.evaluatingType.typeName) == true && 
                             match32.Contains(right.evaluatingType.typeName) == true)
                         {
-                            ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnbc);
-                            ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnbc);
+                            ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
+                            ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
 
-                            fnbc.Add((byte)instr32);
+                            fnBuild.AddInstr(instr32);
                             return new ValueRef(ValueLoc.ValueOnStack, -1, -1, fnd.GetType("int"));
                         }
                         else if(
                             match64.Contains(left.evaluatingType.typeName) == true &&
                             match64.Contains(right.evaluatingType.typeName) == true)
                         {
-                            ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnbc);
-                            ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnbc);
+                            ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
+                            ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
 
-                            fnbc.Add((byte)instr64);
+                            fnBuild.AddInstr(instr64);
                             return new ValueRef(ValueLoc.ValueOnStack, -1, -1, fnd.GetType("int64"));
                         }
                         else
@@ -1988,19 +1943,17 @@ namespace PxPre.SynthSyn
                         // https://github.com/WebAssembly/design/issues/701
                         if (match32.Contains(astVal.evaluatingType.typeName) == true)
                         {
-                            ValueRef vrVal = BuildBSFunctionExpression(fnd, astVal, wasmBuild, ctxBuilder, fnbc);
+                            ValueRef vrVal = BuildBSFunctionExpression(fnd, astVal, wasmBuild, ctxBuilder, fnBuild);
 
-                            fnbc.Add((byte)WASM.Instruction.i32_const);
-                            fnbc.AddRange(WASM.BinParse.EncodeSignedLEB(-1));
-                            fnbc.Add((byte)WASM.Instruction.i32_xor);
+                            fnBuild.Add_I32Const(-1);
+                            fnBuild.AddInstr(WASM.Instruction.i32_xor);
                         }
                         else if(match64.Contains(astVal.evaluatingType.typeName) == true)
                         {
-                            ValueRef vrVal = BuildBSFunctionExpression(fnd, astVal, wasmBuild, ctxBuilder, fnbc);
+                            ValueRef vrVal = BuildBSFunctionExpression(fnd, astVal, wasmBuild, ctxBuilder, fnBuild);
 
-                            fnbc.Add((byte)WASM.Instruction.i64_const);
-                            fnbc.AddRange(WASM.BinParse.EncodeSignedLEB((long)-1));
-                            fnbc.Add((byte)WASM.Instruction.i64_xor);
+                            fnBuild.Add_I64Const(-1);
+                            fnBuild.AddInstr(WASM.Instruction.i64_xor);
                         }
                         else
                         {
@@ -2022,20 +1975,20 @@ namespace PxPre.SynthSyn
                             match32.Contains(left.evaluatingType.typeName) == true &&
                             match32.Contains(right.evaluatingType.typeName) == true)
                         {
-                            ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnbc);
-                            ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnbc);
+                            ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
+                            ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
 
-                            fnbc.Add((byte)WASM.Instruction.i32_shl);
+                            fnBuild.AddInstr(WASM.Instruction.i32_shl);
                             return new ValueRef(ValueLoc.ValueOnStack, -1, -1, fnd.GetType("int"));
                         }
                         else if (
                             match64.Contains(left.evaluatingType.typeName) == true &&
                             match64.Contains(right.evaluatingType.typeName) == true)
                         {
-                            ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnbc);
-                            ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnbc);
+                            ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
+                            ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
 
-                            fnbc.Add((byte)WASM.Instruction.i64_shl);
+                            fnBuild.AddInstr(WASM.Instruction.i64_shl);
                             return new ValueRef(ValueLoc.ValueOnStack, -1, -1, fnd.GetType("int64"));
                         }
                         else
@@ -2059,8 +2012,8 @@ namespace PxPre.SynthSyn
                             match32.Contains(left.evaluatingType.typeName) == true &&
                             match32.Contains(right.evaluatingType.typeName) == true)
                         {
-                            ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnbc);
-                            ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnbc);
+                            ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
+                            ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
 
                             // TODO: More work needs to be done to figure out casting of lower unsigned values
                             switch(right.evaluatingType.typeName)
@@ -2068,13 +2021,13 @@ namespace PxPre.SynthSyn
                                 case "int8":
                                 case "int16":
                                 case "int":
-                                    fnbc.Add((byte)WASM.Instruction.i32_shr_s);
+                                    fnBuild.AddInstr(WASM.Instruction.i32_shr_s);
                                     break;
 
                                 case "uint8":
                                 case "uint16":
                                 case "uint":
-                                    fnbc.Add((byte)WASM.Instruction.i32_shr_u);
+                                    fnBuild.AddInstr(WASM.Instruction.i32_shr_u);
                                     break;
                             }
 
@@ -2084,13 +2037,13 @@ namespace PxPre.SynthSyn
                             match64.Contains(left.evaluatingType.typeName) == true &&
                             match64.Contains(right.evaluatingType.typeName) == true)
                         {
-                            ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnbc);
-                            ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnbc);
+                            ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
+                            ValueRef vrRight = BuildBSFunctionExpression(fnd, right, wasmBuild, ctxBuilder, fnBuild);
 
                             if(right.evaluatingType.typeName == "int64")
-                                fnbc.Add((byte)WASM.Instruction.i64_shr_s);
+                                fnBuild.AddInstr(WASM.Instruction.i64_shr_s);
                             else if(right.evaluatingType.typeName == "uint64")
-                                fnbc.Add((byte)WASM.Instruction.i64_shr_u);
+                                fnBuild.AddInstr(WASM.Instruction.i64_shr_u);
 
                             return new ValueRef(ValueLoc.ValueOnStack, -1, -1, fnd.GetType("int64"));
                         }
@@ -2116,23 +2069,21 @@ namespace PxPre.SynthSyn
                         {
 
                             // This will put/calculate the evaluated intrinsic value on the stack.
-                            ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[1], wasmBuild, ctxBuilder, fnbc);
+                            ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[1], wasmBuild, ctxBuilder, fnBuild);
                             if(vr.varType.intrinsic == false)
                                 throw new SynthExceptionCompile("Initializing non-intrinsic variables on the stack is currently not supported.");
 
-                            fnbc.Add((byte)WASM.Instruction.local_set);
-                            fnbc.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)vrReg.idx));
+                            fnBuild.Add_LocalSet((uint)vrReg.idx);
                         }
                         return new ValueRef(ValueLoc.NoValue, 0, 0, vrReg.varType);
                     }
 
                 case TokenASTType.DeclBool:
                     {
-                        fnbc.Add((byte)WASM.Instruction.i32_const);
                         if(expr.token.fragment == "false" || expr.token.fragment == "0")
-                            fnbc.Add(0);
+                            fnBuild.Add_I32Const(0);
                         else
-                            fnbc.Add(1);
+                            fnBuild.Add_I32Const(1);
 
                         ctxBuilder.PushType(expr.evaluatingType);
                         return new ValueRef( ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
@@ -2140,56 +2091,56 @@ namespace PxPre.SynthSyn
 
                 case TokenASTType.DeclUInt:
                     {
-                        fnbc.Add((byte)WASM.Instruction.i32_const);
-                        uint val = uint.Parse(expr.token.fragment);
                         // i32.const values are uninterpreted ints, which are
                         // signed
-                        fnbc.AddRange(WASM.BinParse.EncodeSignedLEB((int)val));
+                        uint val = uint.Parse(expr.token.fragment);
+                        fnBuild.Add_I32Const((int)val);
+
                         ctxBuilder.PushType(expr.evaluatingType);
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.DeclSInt:
                     { 
-                        fnbc.Add((byte)WASM.Instruction.i32_const);
                         int val = int.Parse(expr.token.fragment);
+                        fnBuild.Add_I32Const(val);
+
                         ctxBuilder.PushType(expr.evaluatingType);
-                        fnbc.AddRange(WASM.BinParse.EncodeSignedLEB(val));
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.DeclUInt64:
                     { 
-                        fnbc.Add((byte)WASM.Instruction.i64_const);
                         ulong val = ulong.Parse(expr.token.fragment);
-                        fnbc.AddRange(WASM.BinParse.EncodeSignedLEB((long)val));
+                        fnBuild.Add_I64Const(val);
+
                         ctxBuilder.PushType(expr.evaluatingType);
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.DeclSInt64:
                     { 
-                        fnbc.Add((byte)WASM.Instruction.i64_const);
                         long val = long.Parse(expr.token.fragment);
-                        fnbc.AddRange(WASM.BinParse.EncodeSignedLEB(val));
+                        fnBuild.Add_I64Const(val);
+
                         ctxBuilder.PushType(expr.evaluatingType);
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.DeclFloat:
                     { 
-                        fnbc.Add((byte)WASM.Instruction.f32_const);
                         float val = float.Parse(expr.token.fragment);
-                        fnbc.AddRange(System.BitConverter.GetBytes(val));
+                        fnBuild.Add_F32Const(val);
+
                         ctxBuilder.PushType(expr.evaluatingType);
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.DeclFloat64:
-                    { 
-                        fnbc.Add((byte)WASM.Instruction.f64_const);
+                    {
                         double val = double.Parse(expr.token.fragment);
-                        fnbc.AddRange(System.BitConverter.GetBytes(val));
+                        fnBuild.Add_F64Const(val);
+
                         ctxBuilder.PushType(expr.evaluatingType);
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
@@ -2202,38 +2153,38 @@ namespace PxPre.SynthSyn
 
                 case TokenASTType.UIntToFloat:
                     {
-                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnbc);
-                        fnbc.Add((byte)WASM.Instruction.f32_convert_i32_u);
+                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
+                        fnBuild.AddInstr(WASM.Instruction.f32_convert_i32_u);
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.UIntToDouble:
                     {
-                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnbc);
-                        fnbc.Add((byte)WASM.Instruction.f64_convert_i32_u);
+                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
+                        fnBuild.AddInstr(WASM.Instruction.f64_convert_i32_u);
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.UIntToUInt64:
                     {
-                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnbc);
-                        fnbc.Add((byte)WASM.Instruction.i64_extend_i32_u);
+                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
+                        fnBuild.AddInstr(WASM.Instruction.i64_extend_i32_u);
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.SIntToSInt64:
                     {
-                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnbc);
-                        fnbc.Add((byte)WASM.Instruction.i64_extend_i32_s);
+                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
+                        fnBuild.AddInstr(WASM.Instruction.i64_extend_i32_s);
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
                 case TokenASTType.FloatToUInt:
                     {
-                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnbc);
+                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
                         ctxBuilder.PopType(expr.branches[0].evaluatingType);
                         ctxBuilder.PushType(expr.evaluatingType);
-                        fnbc.Add((byte)WASM.Instruction.i32_trunc_f32_u);
+                        fnBuild.AddInstr(WASM.Instruction.i32_trunc_f32_u);
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
@@ -2266,11 +2217,11 @@ namespace PxPre.SynthSyn
 
                 case TokenASTType.Cast_Int:
                     {
-                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnbc);
+                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
                         if(vr.varType.intrinsic == false)
                             throw new SynthExceptionSyntax(expr.token, $"Cannot convert type {vr.varType.typeName} to int.");
 
-                        vr.PutInstrinsicValueOnStack(fnbc);
+                        vr.PutInstrinsicValueOnStack(fnBuild);
 
                         switch (vr.varType.typeName)
                         {
@@ -2285,15 +2236,15 @@ namespace PxPre.SynthSyn
 
                             case "int64":
                             case "uint64":
-                                fnbc.Add((byte)WASM.Instruction.i32_wrap_i64);
+                                fnBuild.AddInstr(WASM.Instruction.i32_wrap_i64);
                                 break;
 
                             case "float":
-                                fnbc.Add((byte)WASM.Instruction.i32_trunc_f32_s);
+                                fnBuild.AddInstr(WASM.Instruction.i32_trunc_f32_s);
                                 break;
 
                             case "float64":
-                                fnbc.Add((byte)WASM.Instruction.i32_trunc_f64_s);
+                                fnBuild.AddInstr(WASM.Instruction.i32_trunc_f64_s);
                                 break;
                         }
 
@@ -2306,11 +2257,11 @@ namespace PxPre.SynthSyn
 
                 case TokenASTType.Cast_Int8:
                     {
-                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnbc);
+                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
                         if(vr.varType.intrinsic == false)
                             throw new SynthExceptionSyntax(expr.token, $"Cannot convert type {vr.varType.typeName} to int8.");
 
-                        vr.PutInstrinsicValueOnStack(fnbc);
+                        vr.PutInstrinsicValueOnStack(fnBuild);
 
                         switch(vr.varType.typeName)
                         { 
@@ -2327,15 +2278,15 @@ namespace PxPre.SynthSyn
 
                             case "int64":
                             case "uint64":
-                                fnbc.Add((byte)WASM.Instruction.i32_wrap_i64);
+                                fnBuild.AddInstr(WASM.Instruction.i32_wrap_i64);
                                 break;
 
                             case "float":
-                                fnbc.Add((byte)WASM.Instruction.i32_trunc_f32_s);
+                                fnBuild.AddInstr(WASM.Instruction.i32_trunc_f32_s);
                                 break;
 
                             case "float64":
-                                fnbc.Add((byte)WASM.Instruction.i32_trunc_f64_s);
+                                fnBuild.AddInstr(WASM.Instruction.i32_trunc_f64_s);
                                 break;
                         }
 
@@ -2363,7 +2314,7 @@ namespace PxPre.SynthSyn
                         if(expr.branches.Count != 1)
                             throw new SynthExceptionImpossible("Attempting to cast float with unexpected number of branches.");
 
-                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnbc);
+                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
 
                         if(vr.valLoc != ValueLoc.ValueOnStack)
                             throw new SynthExceptionCompile("Only stack conversions are currently allowed.");
@@ -2374,35 +2325,35 @@ namespace PxPre.SynthSyn
                                 return vr;
 
                             case "float64":
-                                fnbc.Add((byte)WASM.Instruction.f32_demote_f64);
+                                fnBuild.AddInstr(WASM.Instruction.f32_demote_f64);
                                 break;
 
                             case "uint8":
                             case "uint16":
                             case "uint":
-                                fnbc.Add((byte)WASM.Instruction.f32_convert_i32_u);
+                                fnBuild.AddInstr(WASM.Instruction.f32_convert_i32_u);
                                 break;
 
                             case "int8":
-                                fnbc.Add((byte)WASM.Instruction.i32_extend8_s);
-                                fnbc.Add((byte)WASM.Instruction.f32_convert_i32_s);
+                                fnBuild.AddInstr(WASM.Instruction.i32_extend8_s);
+                                fnBuild.AddInstr(WASM.Instruction.f32_convert_i32_s);
                                 break;
 
                             case "int16":
-                                fnbc.Add((byte)WASM.Instruction.i32_extend16_s);
-                                fnbc.Add((byte)WASM.Instruction.f32_convert_i32_s);
+                                fnBuild.AddInstr(WASM.Instruction.i32_extend16_s);
+                                fnBuild.AddInstr(WASM.Instruction.f32_convert_i32_s);
                                 break;
 
                             case "int":
-                                fnbc.Add((byte)WASM.Instruction.f32_convert_i32_s);
+                                fnBuild.AddInstr(WASM.Instruction.f32_convert_i32_s);
                                 break;
 
                             case "int64":
-                                fnbc.Add((byte)WASM.Instruction.f32_convert_i64_s);
+                                fnBuild.AddInstr(WASM.Instruction.f32_convert_i64_s);
                                 break;
 
                             case "uint64":
-                                fnbc.Add((byte)WASM.Instruction.f32_convert_i64_u);
+                                fnBuild.AddInstr(WASM.Instruction.f32_convert_i64_u);
                                 break;
 
                             default:
@@ -2439,7 +2390,7 @@ namespace PxPre.SynthSyn
                     { 
                         for(int i = 0; i < expr.branches.Count; ++i)
                         {
-                            BuildBSFunctionExpression(fnd, expr.branches[i], wasmBuild, ctxBuilder, fnbc);
+                            BuildBSFunctionExpression(fnd, expr.branches[i], wasmBuild, ctxBuilder, fnBuild);
                         }
 
                         if(expr.synthObj == null)
@@ -2457,8 +2408,8 @@ namespace PxPre.SynthSyn
                         if(fnIdx.HasValue == false)
                             throw new SynthExceptionImpossible("");
 
-                        fnbc.Add((byte)WASM.Instruction.call);
-                        fnbc.AddRange(WASM.BinParse.EncodeUnsignedLEB(fnIdx.Value));
+                        fnBuild.AddInstr(WASM.Instruction.call);
+                        fnBuild.AddLEB128(fnIdx.Value);
 
                         // TODO: Figure out where return value (if any) is and
                         // place it in the return value.
@@ -2475,7 +2426,7 @@ namespace PxPre.SynthSyn
                         if(expr.branches.Count != 1)
                             throw new SynthExceptionImpossible("Negate encountered with unexpected AST branches.");
 
-                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnbc);
+                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
                         switch(vr.varType.typeName)
                         { 
                             case "int8":
@@ -2484,28 +2435,24 @@ namespace PxPre.SynthSyn
                             case "uin16":
                             case "int":
                             case "uint":
-                                fnbc.Add((byte)WASM.Instruction.i32_const);
-                                fnbc.AddRange(WASM.BinParse.EncodeSignedLEB(-1));
-                                fnbc.Add((byte)WASM.Instruction.i32_mul);
+                                fnBuild.Add_I32Const(-1);
+                                fnBuild.AddInstr(WASM.Instruction.i32_mul);
                                 return new ValueRef(ValueLoc.ValueOnStack, -1, -1, vr.varType);
 
                             case "int64":
                             case "uint64":
-                                fnbc.Add((byte)WASM.Instruction.i64_const);
-                                fnbc.AddRange(WASM.BinParse.EncodeSignedLEB(-1));
-                                fnbc.Add((byte)WASM.Instruction.i64_mul);
+                                fnBuild.Add_I64Const(-1);
+                                fnBuild.AddInstr(WASM.Instruction.i64_mul);
                                 return new ValueRef(ValueLoc.ValueOnStack, -1, -1, vr.varType);
 
                             case "float":
-                                fnbc.Add((byte)WASM.Instruction.f32_const);
-                                fnbc.AddRange(System.BitConverter.GetBytes(-1.0f));
-                                fnbc.Add((byte)WASM.Instruction.f32_mul);
+                                fnBuild.Add_F32Const(-1.0f);
+                                fnBuild.AddInstr(WASM.Instruction.f32_mul);
                                 return new ValueRef(ValueLoc.ValueOnStack, -1, -1, vr.varType);
 
                             case "float64":
-                                fnbc.Add((byte)WASM.Instruction.f64_const);
-                                fnbc.AddRange(System.BitConverter.GetBytes(-1.0));
-                                fnbc.Add((byte)WASM.Instruction.f64_mul);
+                                fnBuild.Add_F64Const(-1.0);
+                                fnBuild.AddInstr(WASM.Instruction.f64_mul);
                                 return new ValueRef(ValueLoc.ValueOnStack, -1, -1, vr.varType);
 
                             default:

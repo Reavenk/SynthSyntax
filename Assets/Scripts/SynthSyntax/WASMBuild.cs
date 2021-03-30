@@ -547,16 +547,16 @@ namespace PxPre.SynthSyn
                 }
 
                 WASMByteBuilder startFn = new WASMByteBuilder();
-                startFn.bin.Add(0); // Local declarations
+                startFn.AddLEB128(0); // Local declarations
                 // Set the starting stack position (4) in memory. This is basically the stack position, but
                 // we reserve the first 4 bytes for the stack information.
-                startFn.AddInstrI32Const(4);
-                startFn.AddInstrI32Const(0);
-                startFn.AddInstrI32Store();
-                startFn.AddInstrI32End();
+                startFn.Add_I32Const(4);
+                startFn.Add_I32Const(0);
+                startFn.Add_I32Store();
+                startFn.Add_End();
                 //
-                codeSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)startFn.bin.Count));
-                codeSection.AddRange(startFn.bin);
+                codeSection.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)startFn.BinCount()));
+                codeSection.AddRange(startFn.Bin());
 
                 fileContent.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)codeSection.Count));
                 fileContent.AddRange(codeSection);
@@ -663,7 +663,7 @@ namespace PxPre.SynthSyn
             // handled later.
 
             // The program binary
-            List<byte> fnBCBytes = new List<byte>();
+            WASMByteBuilder fnBuild = new WASMByteBuilder();
 
             // Gather all the local variables
             List<WASM.Bin.TypeID> localVarTys = new List<WASM.Bin.TypeID>();
@@ -719,16 +719,19 @@ namespace PxPre.SynthSyn
                 consolidatedLocalTys.Add(new KeyValuePair<WASM.Bin.TypeID, int>(tyid, ct));
             }
 
-            fnBCBytes.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)consolidatedLocalTys.Count)); // Local decl
+            fnBuild.AddLEB128((uint)consolidatedLocalTys.Count); // Local decl
             for (int i = 0; i < consolidatedLocalTys.Count; ++i)
             {
-                fnBCBytes.AddRange(WASM.BinParse.EncodeUnsignedLEB((uint)consolidatedLocalTys[i].Value));
-                fnBCBytes.AddRange(WASM.BinParse.EncodeUnsignedLEB((byte)consolidatedLocalTys[i].Key));
+                fnBuild.AddLEB128((uint)consolidatedLocalTys[i].Value);
+
+                // These are really bytes, but they'll end up being added as bytes since they're
+                // small constants
+                fnBuild.AddLEB128((int)consolidatedLocalTys[i].Key); 
             }
 
-            builder.BuildBSFunction(fnd, fnd.ast, this, builder, fnBCBytes);
-            fnBCBytes.Add((byte)WASM.Instruction.end);
-            fnd.fnBin = fnBCBytes.ToArray();
+            builder.BuildBSFunction(fnd, fnd.ast, this, builder, fnBuild);
+            fnBuild.Add_End();
+            fnd.fnBin = fnBuild.Bin();
 
             SynthLog.Log($"Exiting SynthFuncDecl.Build({fnd.functionName}).");
             return builder;
