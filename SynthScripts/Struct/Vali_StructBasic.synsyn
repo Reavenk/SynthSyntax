@@ -1,0 +1,32 @@
+// 
+// 
+// >> Name: "Struct Basic"
+// >> Results : {11, 15, 10}
+// 
+// Results : {11, 15, 12, 10}
+
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+struct TestStruct
+{
+	int a;
+	int b;
+	float c;
+	int8 d;
+}
+
+entry DoTest()
+{
+	TestStruct ts;
+	ts.a = 5 + 6;
+	ts.b = 7 + 8;
+	//ts.c = 12.34f;
+	ts.d = 10;
+	
+	LogTest(ts.a);
+	LogTest(ts.b);
+	//LogTest(ts.c); // Casts not supported yet (wleu 03/29/2021)
+	LogTest(ts.d);
+}
