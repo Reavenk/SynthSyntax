@@ -82,8 +82,8 @@ namespace PxPre.SynthSyn
                             List<Token> setExpr = tokens.GetRange(3, tokens.Count - 3);
                             ttVarDecl.nodes.Add(EatTokensIntoTree(setExpr, scope, false));
 
-                            return ttVarDecl;
                         }
+                        return ttVarDecl;
                     }
                 }
             }
@@ -558,6 +558,23 @@ namespace PxPre.SynthSyn
                 nodes[0].nodes.Add(astExpr);
                 nodes.RemoveAt(1);
 
+                return nodes[0];
+            }
+
+            SynthType st = scope.GetType(nodes[0].root.fragment);
+            if(st != null)
+            { 
+                // TODO: Combine this with intrinsic declarations?
+                if(st.intrinsic == true)
+                    throw new SynthExceptionSyntax(nodes[0].root, "Processing intrinsic type at unexpected location.");
+
+                if(nodes.Count != 2)
+                    throw new SynthExceptionSyntax(nodes[0].root, "Invalid syntax to declare type.");
+
+                if(nodes[1].root.Matches( TokenType.tyWord ) == false)
+                    throw new SynthExceptionSyntax(nodes[1].root, "Invalid struct variable name.");
+
+                nodes[0].nodes.Add(nodes[1]);
                 return nodes[0];
             }
 

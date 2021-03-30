@@ -104,6 +104,7 @@ namespace PxPre.SynthSyn
         Compare_GreaterThan,
         Compare_GreaterThanEq,
 
+        DerefName,
         CallMember,
         CallGlobalFn,
 
