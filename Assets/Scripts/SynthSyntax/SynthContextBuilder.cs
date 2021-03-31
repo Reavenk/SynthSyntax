@@ -2062,8 +2062,10 @@ namespace PxPre.SynthSyn
                                 if(vrReg.varType.intrinsic == true)
                                     throw new SynthExceptionSyntax(expr.branches[1].token, "Cannot construct intrinsic type.");
 
-                                //vrReg.PutInstrinsicValueOnStack(fnBuild)
-                                //expr.branches[1].
+                                vrReg.PutLocalVarAddressOnStack(fnBuild);
+
+                                SynthFuncDecl sfdConstr = expr.branches[1].synthObj.CastFuncDecl();
+                                BuildBSFunctionInvoke(sfdConstr, true, fnd, expr.branches[1], wasmBuild, ctxBuilder, fnBuild);
                             }
                             else
                             {
@@ -2413,40 +2415,17 @@ namespace PxPre.SynthSyn
 
                 case TokenASTType.CallGlobalFn:
                     { 
-                        for(int i = 0; i < expr.branches.Count; ++i)
-                        {
-                            ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[i], wasmBuild, ctxBuilder, fnBuild);
-
-                            if(vr.varType.intrinsic == true)
-                                vr.PutInstrinsicValueOnStack(fnBuild);
-                        }
-
                         if(expr.synthObj == null)
                             throw new SynthExceptionImpossible("Missing function for global AST processing.");
 
-                        SynthFuncDecl fn = expr.synthObj.CastFuncDecl();
-                        if(fn == null)
+                        SynthFuncDecl fnInvoke = expr.synthObj.CastFuncDecl();
+                        if(fnInvoke == null)
                             throw new SynthExceptionImpossible("Missing function for global AST processing.");
 
-                        if(fn.isStatic == false)
+                        if(fnInvoke.isStatic == false)
                             throw new SynthExceptionImpossible("Attempting to call static function which is not recorded as static.");
 
-                        uint ? fnIdx = wasmBuild.GetFunctionIndex(fn);
-
-                        if(fnIdx.HasValue == false)
-                            throw new SynthExceptionImpossible("");
-
-                        fnBuild.AddInstr(WASM.Instruction.call);
-                        fnBuild.AddLEB128(fnIdx.Value);
-
-                        // TODO: Figure out where return value (if any) is and
-                        // place it in the return value.
-                        if(fn.returnType == null)
-                            return new ValueRef(ValueLoc.NoValue, 0, 0, null);
-                        else if(fn.returnType.intrinsic == true)
-                            return new ValueRef( ValueLoc.ValueOnStack, 0, 0, fn.returnType);
-                        else
-                            return new ValueRef(ValueLoc.ValueOnMemStack, 0, 0, fn.returnType);
+                        return BuildBSFunctionInvoke(fnInvoke, true, fnd, expr, wasmBuild, ctxBuilder, fnBuild);
                     }
 
                 case TokenASTType.Negate:
@@ -2495,6 +2474,46 @@ namespace PxPre.SynthSyn
             }
 
             throw new SynthExceptionImpossible($"Unhandled AST type {expr.astType}.");
+        }
+
+        public ValueRef BuildBSFunctionInvoke(
+            SynthFuncDecl fnInvoke, 
+            bool evalFirst, 
+            SynthFuncDecl fnd, 
+            TokenAST expr, 
+            WASMBuild wasmBuild, 
+            SynthContextBuilder ctxBuilder, 
+            WASMByteBuilder fnBuild)
+        { 
+            int firstIndex = 0;
+
+            if(evalFirst == false)
+                firstIndex = 1;
+
+            for (int i = firstIndex; i < expr.branches.Count; ++i)
+            {
+                ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[i], wasmBuild, ctxBuilder, fnBuild);
+
+                if (vr.varType.intrinsic == true)
+                    vr.PutInstrinsicValueOnStack(fnBuild);
+            }
+
+            uint? fnIdx = wasmBuild.GetFunctionIndex(fnInvoke);
+
+            if (fnIdx.HasValue == false)
+                throw new SynthExceptionImpossible("");
+
+            fnBuild.AddInstr(WASM.Instruction.call);
+            fnBuild.AddLEB128(fnIdx.Value);
+
+            // TODO: Figure out where return value (if any) is and
+            // place it in the return value.
+            if (fnInvoke.returnType == null)
+                return new ValueRef(ValueLoc.NoValue, 0, 0, null);
+            else if (fnInvoke.returnType.intrinsic == true)
+                return new ValueRef(ValueLoc.ValueOnStack, 0, 0, fnInvoke.returnType);
+            else
+                return new ValueRef(ValueLoc.ValueOnMemStack, 0, 0, fnInvoke.returnType);
         }
 
         public static void EnsureNoTreeChildNodes(TokenTree tt)

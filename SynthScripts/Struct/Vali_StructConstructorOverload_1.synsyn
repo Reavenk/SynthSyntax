@@ -1,0 +1,45 @@
+// Given multiple constructors, choose the correct one based
+// on the parameter pattern.
+// 
+// >> Name: "Struct Constructor Overload 1"
+// >> Results : {10, 20, 123}
+// 
+
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+struct TestStruct
+{
+	int a;
+	int b;
+	float c;
+	int8 d;
+	
+	TestStruct(int va, int b, float vc, int8 d)
+	{
+		a = va * 2;
+		this.b = b;
+		this.c = vc;
+		this.d = d + 10;
+	}
+	
+	TestStruct(int v)
+	{
+		// Implicit this dereference
+		a = v;
+		b = v * 2;
+		c = 3.3f;
+		d = 123;
+	}
+}
+
+entry DoTest()
+{	
+	TestStruct ts = TestStruct(10);
+	
+	LogTest(ts.a);
+	LogTest(ts.b);
+	//LogTest(ts.c);
+	LogTest(ts.d);
+}

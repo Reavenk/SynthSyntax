@@ -518,7 +518,18 @@ namespace PxPre.SynthSyn
                         { 
                             int iter = 0;
                             Parser.MovePastScopeTComma(ref iter, parenToks);
-                            nodes[i].nodes.Add(EatTokensIntoTree(parenToks.GetRange(0, iter), scope, false));
+
+                            List<Token> paramExpr = parenToks.GetRange(0, iter);
+                            if(paramExpr[paramExpr.Count - 1].MatchesSymbol(",") == true)
+                            {
+                                if(paramExpr.Count == 1)
+                                    throw new SynthExceptionSyntax( paramExpr[0], "Empty parameter expression.");
+
+                                paramExpr.RemoveAt(paramExpr.Count - 1);
+                            }
+
+
+                            nodes[i].nodes.Add(EatTokensIntoTree(paramExpr, scope, false));
                             parenToks.RemoveRange(0, iter);
                         }
 
