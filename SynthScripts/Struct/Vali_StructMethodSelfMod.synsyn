@@ -1,0 +1,61 @@
+// Test methods that modify internal variables.
+// 
+// >> Name: "Struct Method Self Mod"
+// >> Results : {10, 20, 123, 999, 1221, 1630}
+// 
+
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+struct TestStruct
+{
+	int a;
+	int b;
+	float c;
+	int8 d;
+	
+	TestStruct(int v)
+	{
+		// Implicit this dereference
+		a = v;
+		b = v * 2;
+		c = 3.3f;
+		d = 123;
+	}
+	
+	void SetATo999()
+	{
+		this.a = 999;
+	}
+	
+	void AddToA(int val)
+	{
+		a = a + val; // += not currently supported
+	}
+	
+	void Combobulate(int ma, int mb, int md)
+	{
+		a = a * ma + b * mb + d * md;
+	}
+}
+
+entry DoTest()
+{	
+	TestStruct ts = TestStruct(10);
+	
+	LogTest(ts.a);
+	LogTest(ts.b);
+	LogTest(ts.d);
+	
+	ts.SetATo999();
+	LogTest(ts.a);
+	
+	ts.AddToA(222);
+	LogTest(ts.a);
+	
+	ts.Combobulate(1, 2, 3);
+	LogTest(ts.a);
+	
+	EndTest();
+}
