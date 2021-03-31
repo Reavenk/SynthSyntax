@@ -621,7 +621,8 @@ namespace PxPre.SynthSyn
                 SynthLog.LogFragments(execLine);
 
                 TokenTree rootLineNode = TokenTree.EatTokensIntoTree(execLine, fnd, true);
-                //treeLines.Add(rootLineNode);
+
+                SynthLog.LogTree(rootLineNode);
 
                 // If it's a member function (not a static function) then full in the struct
                 // we belong to as a he invoking scope. Or else set it to null. Its syntax scope
