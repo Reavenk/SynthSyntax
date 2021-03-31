@@ -1,0 +1,57 @@
+// 
+// 
+// >> Name: "Multiple structs"
+// >> Results : {10, 20, 60, 550, 70, 11000, 99, 7}
+// 
+
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+struct TestStruct
+{
+	int a;
+	int b;
+	float c;
+	int8 d;
+	
+	TestStruct(int va, int b, float vc, int8 d)
+	{
+		a = va;
+		this.b = b;
+		//this.c = vc;
+		this.d = d;
+	}
+	
+	TestStruct(int v)
+	{
+		a = v + 50;
+		b = v * 55;
+		//c = v * 3.3f;
+		d = 99;
+	}
+	
+	~TestStruct()
+	{
+		LogTest(d);
+	}
+}
+
+entry DoTest()
+{
+	TestStruct tsa = TestStruct(10, 20, 34.56f, 7);
+	
+	LogTest(tsa.a);
+	LogTest(tsa.b);
+	
+	TestStruct tsb = TestStruct(10);
+	
+	LogTest(tsb.a);
+	LogTest(tsb.b);
+	
+	LogTest(tsa.a + tsb.a);
+	LogTest(tsa.b * tsb.b);
+	
+	// Expected tsb destructor here
+	// Expected tsa destructor here
+}
