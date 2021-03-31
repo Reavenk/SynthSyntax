@@ -229,7 +229,7 @@ namespace PxPre.SynthSyn
                 return null;
 
             if(lstFn.Count != 1)
-                throw new SynthExceptionImpossible($"{this.typeName} found to have multiple constructors.");
+                throw new SynthExceptionImpossible($"{this.typeName} found to have multiple destructors.");
 
             return lstFn[0];
         }
