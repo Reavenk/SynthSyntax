@@ -4,6 +4,7 @@ using UnityEngine;
 
 namespace PxPre.SynthSyn
 {
+    // TODO: Rename to SynthNestScopeBuilder?
     public class SynthContextBuilder : SynthObj
     {
         public struct OperatorInfo
@@ -24,10 +25,6 @@ namespace PxPre.SynthSyn
             Memory
         }
 
-        
-
-        
-
         /// <summary>
         /// The number of bytes pushed on the stack. Does not include local variables.
         /// </summary>
@@ -43,6 +40,8 @@ namespace PxPre.SynthSyn
         public int totalMemoryStackBytes = 0;
         public List<ValueRef> memStkEle = new List<ValueRef>();
         public Dictionary<string, ValueRef> memStkVars = new Dictionary<string, ValueRef>();
+
+        List<ValueRef> allLocalVars = new List<ValueRef>();
 
         List<TokenAST> asts = new List<TokenAST>();
 
@@ -134,6 +133,8 @@ namespace PxPre.SynthSyn
                 this.locStkEle.Add(vr);
                 this.locStkVars.Add(varName, vr);
                 ++this.totalLocalStack;
+
+                this.allLocalVars.Add(vr);
             }
             else
             { 
@@ -145,6 +146,8 @@ namespace PxPre.SynthSyn
                 this.memStkEle.Add(vr);
                 this.memStkVars.Add(varName, vr);
                 this.totalMemoryStackBytes += type.GetByteSize();
+
+                this.allLocalVars.Add(vr);
             }
         }
 
@@ -2065,7 +2068,7 @@ namespace PxPre.SynthSyn
                                 vrReg.PutLocalVarAddressOnStack(fnBuild);
 
                                 SynthFuncDecl sfdConstr = expr.branches[1].synthObj.CastFuncDecl();
-                                BuildBSFunctionInvoke(sfdConstr, true, fnd, expr.branches[1], wasmBuild, ctxBuilder, fnBuild);
+                                BuildBSFunctionInvoke(sfdConstr, fnd, expr.branches[1], wasmBuild, ctxBuilder, fnBuild);
                             }
                             else
                             {
@@ -2425,7 +2428,7 @@ namespace PxPre.SynthSyn
                         if(fnInvoke.isStatic == false)
                             throw new SynthExceptionImpossible("Attempting to call static function which is not recorded as static.");
 
-                        return BuildBSFunctionInvoke(fnInvoke, true, fnd, expr, wasmBuild, ctxBuilder, fnBuild);
+                        return BuildBSFunctionInvoke(fnInvoke, fnd, expr, wasmBuild, ctxBuilder, fnBuild);
                     }
 
                 case TokenASTType.Negate:
@@ -2471,26 +2474,56 @@ namespace PxPre.SynthSyn
 
                 case TokenASTType.DefaultParam:
                     break;
+
+                case TokenASTType.Destruct:
+                    break;
+
+                case TokenASTType.EndScope:
+                    { 
+                        SynthContextBuilder ctxNest = expr.synthObj.CastNest();
+                        if(ctxNest == null)
+                            throw new SynthExceptionImpossible("Attempting to close the scope of a null nest.");
+
+                        for(int i = ctxNest.allLocalVars.Count - 1; i >= 0; --i)
+                        { 
+                            ValueRef vrToDestr = ctxNest.allLocalVars[i];
+                            if(vrToDestr.varType.intrinsic == true)
+                                continue;
+
+                            SynthFuncDecl fnDestr = vrToDestr.varType.GetDestructor();
+                            if(fnDestr == null)
+                                continue;
+
+                            vrToDestr.PutLocalVarAddressOnStack(fnBuild);
+                            this.BuildBSFunctionDirectInvoke(fnDestr, wasmBuild, fnBuild);
+                        }
+                        return new ValueRef(ValueLoc.NoValue, -1, -1, null);
+                    }
             }
 
             throw new SynthExceptionImpossible($"Unhandled AST type {expr.astType}.");
         }
 
+        /// <summary>
+        /// Evaluate a function's parameters, place them on the stack, and invoke
+        /// the function.
+        /// </summary>
+        /// <param name="fnInvoke">The function to invoke.</param>
+        /// <param name="fnd">The function scope that the invoked function is being called in.</param>
+        /// <param name="expr">Function call expression (used to evaluate the ASTs for the parameters)</param>
+        /// <param name="wasmBuild">The wasm compiler utility.</param>
+        /// <param name="ctxBuilder">The nesting context the function is being invoked in.</param>
+        /// <param name="fnBuild">The WASM binary being generated.</param>
+        /// <returns>Information on the location of the return value.</returns>
         public ValueRef BuildBSFunctionInvoke(
             SynthFuncDecl fnInvoke, 
-            bool evalFirst, 
             SynthFuncDecl fnd, 
             TokenAST expr, 
             WASMBuild wasmBuild, 
             SynthContextBuilder ctxBuilder, 
             WASMByteBuilder fnBuild)
         { 
-            int firstIndex = 0;
-
-            if(evalFirst == false)
-                firstIndex = 1;
-
-            for (int i = firstIndex; i < expr.branches.Count; ++i)
+            for (int i = 0; i < expr.branches.Count; ++i)
             {
                 ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[i], wasmBuild, ctxBuilder, fnBuild);
 
@@ -2498,10 +2531,28 @@ namespace PxPre.SynthSyn
                     vr.PutInstrinsicValueOnStack(fnBuild);
             }
 
+            return BuildBSFunctionDirectInvoke(fnInvoke, wasmBuild, fnBuild);
+        }
+
+        /// <summary>
+        /// Directly invoke a function without concern for the function parameter.
+        /// 
+        /// This should be called for a function without any parameters, or for a function
+        /// whos parameters are already set up.
+        /// </summary>
+        /// <param name="fnInvoke">The function to invoke.</param>
+        /// <param name="wasmBuild">The wasm compiler utility.</param>
+        /// <param name="fnBuild">The wasm binary being generated.</param>
+        /// <returns>Information on the location of the return value.</returns>
+        public ValueRef BuildBSFunctionDirectInvoke(
+            SynthFuncDecl fnInvoke,
+            WASMBuild wasmBuild,
+            WASMByteBuilder fnBuild)
+        {
             uint? fnIdx = wasmBuild.GetFunctionIndex(fnInvoke);
 
             if (fnIdx.HasValue == false)
-                throw new SynthExceptionImpossible("");
+                throw new SynthExceptionImpossible("Cound not find registered index of function");
 
             fnBuild.AddInstr(WASM.Instruction.call);
             fnBuild.AddLEB128(fnIdx.Value);
@@ -2530,6 +2581,11 @@ namespace PxPre.SynthSyn
         public void PopType(SynthType type)
         { 
             //TODO:
+        }
+
+        public override SynthContextBuilder CastNest() 
+        { 
+            return this; 
         }
     }
 }

@@ -85,7 +85,7 @@ namespace PxPre.SynthSyn
                 if(tokens[0].Matches(TokenType.tyWord, "entry") == true)
                 { 
                     SynthFuncDecl sfd = SynthFuncDecl.Parse(this, tokens, "", true, SynthFuncDecl.ParseType.Entry);
-                    sfd.isEntry = true;
+                    sfd.callType = SynthFuncDecl.CallType.Entry;
 
                     if (sfd != null)
                     {

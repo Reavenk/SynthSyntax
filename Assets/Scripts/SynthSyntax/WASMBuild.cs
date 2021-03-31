@@ -639,6 +639,7 @@ namespace PxPre.SynthSyn
                 }
                 fnd.ast.branches.Add(exprAST);
             }
+            fnd.ast.branches.Add(new TokenAST(new Token(), builder, TokenASTType.EndScope, builder, null, false, TokenAST.DataManifest.NoData));
 
             SynthLog.Log("");
             SynthLog.Log($"Encountered {builders.Count} nested scopes.");

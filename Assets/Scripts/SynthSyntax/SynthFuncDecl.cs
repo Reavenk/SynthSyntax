@@ -24,6 +24,42 @@ namespace PxPre.SynthSyn
             StructContext   = Static | Member | Constructor
         }
 
+        public enum CallType
+        { 
+            // Entry functions are exported WASM functions
+            // that are static and do no have a return value.
+            // 
+            // The expected entry names and their use depends 
+            // on what SynthSyntax is used for.
+            Entry,
+
+            /// <summary>
+            /// Extern functions are imported WASM functions. 
+            /// All externed functions are static.
+            /// </summary>
+            Extern,
+
+            /// <summary>
+            /// The function is a static function
+            /// </summary>
+            Static,
+
+            /// <summary>
+            /// The function is a struct member.
+            /// </summary>
+            Member,
+
+            /// <summary>
+            /// The function is a struct constructor.
+            /// </summary>
+            Constructor,
+
+            /// <summary>
+            /// The function is a struct destructor.
+            /// </summary>
+            Destructor
+        }
+
         /// <summary>
         /// The name of the function.
         /// </summary>
@@ -48,16 +84,6 @@ namespace PxPre.SynthSyn
         public Dictionary<string, SynthRegion> regionLookup = new Dictionary<string, SynthRegion>();
 
         /// <summary>
-        /// Cache if the function is an entry.
-        /// </summary>
-        public bool isEntry = false;
-
-        /// <summary>
-        /// True if the function is a constructor.
-        /// </summary>
-        public bool isConstructor = false;
-
-        /// <summary>
         /// Cache if the function is an operator.
         /// </summary>
         public bool isOperator = false;
@@ -68,10 +94,7 @@ namespace PxPre.SynthSyn
         /// </summary>
         public bool isReversible = false;
 
-        /// <summary>
-        /// If true, the function is a global/static. Else, it's a member variable.
-        /// </summary>
-        public bool isStatic = false;
+        public CallType callType;
 
         /// <summary>
         /// Used in BreakApartParsedTokens to specify the cached location where 
@@ -82,13 +105,6 @@ namespace PxPre.SynthSyn
         public int paramByteSize = -1;
 
         public List<List<Token>> executingLines = new List<List<Token>>();
-
-        /// <summary>
-        /// True if the function is provided from external sources.
-        /// 
-        /// In WASM lingo, this means the function will be imported.
-        /// </summary>
-        public bool isExtern = false;
 
         // TODO: Reorganize correctly (refactor)
         // Cached WASM types on the stack. This should map 1-to-1 with the stack variable listing
@@ -101,6 +117,56 @@ namespace PxPre.SynthSyn
         // TODO: Reorganize correctly (refactor)
         // The WASM bytecode for the function.
         public byte [] fnBin = null;
+
+        /// <summary>
+        /// If true, the function is a global/static. Else, it's a member variable.
+        /// </summary>
+        public bool isStatic
+        {
+            get =>
+                this.callType == CallType.Static ||
+                this.callType == CallType.Entry || 
+                this.callType == CallType.Extern;
+        }
+
+        /// <summary>
+        /// Cache if the function is an entry.
+        /// </summary>
+        public bool isEntry
+        {
+            get => this.callType == CallType.Entry;
+        }
+
+        /// <summary>
+        /// True if the function is a constructor.
+        /// </summary>
+        public bool isConstructor
+        {
+            get => this.callType == CallType.Constructor;
+        }
+
+        public bool isDestructor
+        {
+            get => this.callType == CallType.Destructor;
+        }
+
+        public bool isMethod
+        { 
+            get => this.callType == CallType.Member;
+        }
+
+        public bool isStructInvoked
+        { 
+            get => 
+                this.callType == CallType.Member ||
+                this.callType == CallType.Constructor ||
+                this.callType == CallType.Destructor;
+        }
+
+        public bool isExtern
+        { 
+            get => this.callType == CallType.Extern;
+        }
 
         public SynthFuncDecl(SynthScope parentScope)
             : base(parentScope)
@@ -144,8 +210,46 @@ namespace PxPre.SynthSyn
                 break;
             }
 
+            // Explicit check for destructor
+            if((parseTypes & ParseType.Member) != 0 &&
+                string.IsNullOrEmpty(structName) == false &&
+                tokens[idx].MatchesSymbol("~") && 
+                tokens[idx + 1].Matches(TokenType.tyWord) &&
+                tokens[idx + 1].fragment == structName)
+            {
+                if (isStatic == true)
+                    throw new SynthExceptionSyntax(tokens[0], "Static destructors not allowed.");
+
+                if (isExtern == true)
+                    throw new SynthExceptionSyntax(tokens[0], "Externed destructors are not allowed.");
+
+                // We already know this is the same as structName, but we'll extract it
+                // and get the name from the fragment for the sake of rigor.
+                string destructorName = tokens[idx].fragment + tokens[idx + 1].fragment;
+
+                // Finding a destructor is a commited parse.
+                if (tokens[idx + 2].MatchesSymbol("(") == false)
+                    throw new SynthExceptionSyntax(tokens[idx + 2], "Incorrect syntax for destructor.");
+
+                idx += 2;
+                int dstrIdx = idx;
+                Parser.MovePastScopeTSemi(ref dstrIdx, tokens);
+
+                SynthFuncDecl retDstr = new SynthFuncDecl(parentScope);
+                retDstr.returnTyName = "";
+                retDstr.functionName = destructorName;
+                retDstr.callType = CallType.Destructor;
+                retDstr.parenStart = idx;
+
+                retDstr.declPhrase = tokens.GetRange(0, dstrIdx);
+                tokens.RemoveRange(0, dstrIdx);
+
+                retDstr.BreakApartParsedTokens();
+                return retDstr;
+            }
+
             // Explicit check for constructor
-            if(
+            if (
                 (parseTypes & ParseType.Member) != 0 &&
                 string.IsNullOrEmpty(structName) == false && 
                 tokens[idx].Matches(TokenType.tyWord) && 
@@ -173,7 +277,7 @@ namespace PxPre.SynthSyn
                     SynthFuncDecl retConstr     = new SynthFuncDecl(parentScope);
                     retConstr.returnTyName      = "";
                     retConstr.functionName      = constructorName;
-                    retConstr.isConstructor     = true;
+                    retConstr.callType          = CallType.Constructor;
                     retConstr.parenStart        = idx;
 
                     retConstr.declPhrase = tokens.GetRange(0, constrIdx);
@@ -287,9 +391,20 @@ namespace PxPre.SynthSyn
             ret.isReversible    = isReversible;
             ret.isOperator      = isOperator;
             ret.parenStart      = parenSpot;
-            ret.isStatic        = isStatic;
-            ret.isExtern        = isExtern;
-            ret.isEntry         = isEntry;
+
+            if(isEntry == true)
+                ret.callType = CallType.Entry;
+            else if(isExtern == true)
+                ret.callType = CallType.Extern;
+            else if(isStatic == true)
+                ret.callType = CallType.Static;
+            else
+            {
+                // Constructor and destructor declarations are handled elsewhere,
+                // so this is the only thing left be process of elimination.
+                ret.callType = CallType.Member;
+            }
+
 
             ret.declPhrase = tokens.GetRange(0, idx);
             tokens.RemoveRange(0, idx);

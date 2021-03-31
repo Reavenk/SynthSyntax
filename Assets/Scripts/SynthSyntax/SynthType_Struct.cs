@@ -221,5 +221,17 @@ namespace PxPre.SynthSyn
             }
             return null;
         }
+
+        public override SynthFuncDecl GetDestructor()
+        {
+            List<SynthFuncDecl> lstFn;
+            if(this.functions.TryGetValue("~" + this.typeName, out lstFn) == false)
+                return null;
+
+            if(lstFn.Count != 1)
+                throw new SynthExceptionImpossible($"{this.typeName} found to have multiple constructors.");
+
+            return lstFn[0];
+        }
     }
 }

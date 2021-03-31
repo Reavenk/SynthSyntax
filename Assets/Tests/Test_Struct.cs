@@ -31,7 +31,7 @@ namespace Tests
         [Test]
         public void Test_05_Deconstructor()
         {
-            UnitTest_Utils.PerformContainedTest("SynthScripts/Struct/Vali_StructDeconstructor.synsyn");
+            UnitTest_Utils.PerformContainedTest("SynthScripts/Struct/Vali_StructDestructor.synsyn");
         }
 
         [Test]
@@ -43,11 +43,13 @@ namespace Tests
         [Test]
         public void Test_07_MethodSimple()
         {
+            throw new System.Exception("Unimplemented!");
         }
 
         [Test]
         public void Test_07_MethodSelfMod()
         {
+            throw new System.Exception("Unimplemented!");
         }
     }
 }

@@ -33,6 +33,11 @@ namespace PxPre.SynthSyn
         { 
             return null;
         }
+
+        public virtual SynthFuncDecl GetDestructor()
+        { 
+            return null;
+        }
     }
 
 

@@ -17,6 +17,15 @@ namespace PxPre.SynthSyn
         GetThis,
         Construct,
 
+        Destruct,
+
+        /// <summary>
+        /// The last AST generated in the context of a SynthContextBuilder 
+        /// should be an EndScope, which tells the compiler to run all 
+        /// destructors for local variables.
+        /// </summary>
+        EndScope,
+
         // Root AST node for function declarations. Will also have the 
         FunctionDecl,
 

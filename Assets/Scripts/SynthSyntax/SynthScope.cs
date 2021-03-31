@@ -233,11 +233,22 @@ namespace PxPre.SynthSyn
             }
             else 
             { 
-                // Check if there's a signature collision with function overloads
-                foreach(SynthFuncDecl already in fns)
+                if(fnAdding.isDestructor == true)
                 { 
-                    if(already.parameterSet.ExactlyMatches(fnAdding.parameterSet) == true)
-                            throw new System.Exception($"Function declaration {fnAdding.functionName} already included");
+                    foreach(SynthFuncDecl already in fns)
+                    { 
+                        if(already.isDestructor == true)
+                            throw new SynthExceptionSyntax(fnAdding.declPhrase[0], "Attempting to declare multiple destructors.");
+                    }
+                }
+                else
+                {
+                    // Check if there's a signature collision with function overloads
+                    foreach(SynthFuncDecl already in fns)
+                    { 
+                        if(already.parameterSet.ExactlyMatches(fnAdding.parameterSet) == true)
+                                throw new System.Exception($"Function declaration {fnAdding.functionName} already included");
+                    }
                 }
             }
 
