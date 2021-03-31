@@ -172,6 +172,10 @@
 
         public ValueRef PutLocalVarAddressOnStack(WASMByteBuilder fnBuild)
         {
+            // if it's already on the stack then ... it's already on the stack.
+            if(this.valLoc == ValueLoc.PointerOnStack)
+                return new ValueRef(ValueLoc.PointerOnStack, -1, -1, this.varType, 1);
+
             if (this.valLoc == ValueLoc.ValueOnMemStack)
             {
                 // Load the stack pointer at [0]

@@ -1,0 +1,55 @@
+// Test out calling methods and executing
+// method bodies.
+// 
+// >> Name: "Struct Simple Method"
+// >> Results : {10, 20, 45, 10, 10}
+// 
+
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+struct TestStruct
+{
+	int a;
+	int b;
+	float c;
+	int8 d;
+	
+	TestStruct(int v)
+	{
+		// Implicit this dereference
+		a = v;
+		b = v * 2;
+		c = 3.3f;
+		d = 123;
+	}
+	
+	void Log_A()
+	{
+		LogTest(a);
+	}
+	
+	void Log_B()
+	{
+		LogTest(this.b);
+	}
+	
+	void Log_BPlus(int plVal)
+	{
+		LogTest(b + plVal);
+	}
+}
+
+entry DoTest()
+{	
+	TestStruct ts = TestStruct(10);
+	
+	ts.Log_A();
+	ts.Log_B();
+	ts.Log_BPlus(25);
+	ts.Log_A();
+	ts.Log_A();
+	
+	EndTest();
+}

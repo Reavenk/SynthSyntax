@@ -83,5 +83,23 @@ namespace PxPre.SynthSyn
         { 
             Log(string.Join( " ", tokens.Select(x=>x.fragment)));
         }
+
+        public static void LogTree(TokenTree tt)
+        {
+            LogTree(tt, 0);
+        }
+
+        private static void LogTree(TokenTree tt, int indent)
+        {
+            string str = $"TTree ty:[{tt.root.type}] --- frag:[{tt.root.fragment}]";
+
+            if(string.IsNullOrEmpty(tt.keyword) == false)
+                str += $" - keyw : {tt.keyword}";
+
+            LogIndent(indent, str);
+
+            foreach(TokenTree ch in tt.nodes)
+                LogTree(ch, indent + 1 );
+        }
     }
 }

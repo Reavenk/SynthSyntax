@@ -540,26 +540,40 @@ namespace PxPre.SynthSyn
 
                 SynthVarValue svv = astSrc.evaluatingType.GetVar(node.nodes[1].root.fragment);
 
-                // TODO: Do we support const member variables?
-                TokenAST astDeref = 
-                    new TokenAST(
-                        node.nodes[1].root, 
-                        this, 
-                        TokenASTType.DerefName, 
-                        svv, 
-                        svv.type, 
-                        false, 
-                        TokenAST.DataManifest.NoData);
+                if(svv != null)
+                {
+                    // TODO: Do we support const member variables?
+                        TokenAST astDeref = 
+                        new TokenAST(
+                            node.nodes[1].root, 
+                            this, 
+                            TokenASTType.DerefName, 
+                            svv, 
+                            svv.type, 
+                            false, 
+                            TokenAST.DataManifest.NoData);
 
-                return new TokenAST(
-                    node.root, 
-                    this, 
-                    TokenASTType.GetMemberVar, 
-                    svv, svv.type, 
-                    true, 
-                    TokenAST.DataManifest.Procedural,
-                    astSrc,
-                    astDeref);
+                    return new TokenAST(
+                        node.root, 
+                        this, 
+                        TokenASTType.GetMemberVar, 
+                        svv, svv.type, 
+                        true, 
+                        TokenAST.DataManifest.Procedural,
+                        astSrc,
+                        astDeref);
+                }
+
+                // If a variable dereference wasn't found, the only other possibility is a 
+                // method call
+                if(node.nodes[1].root.Matches(TokenType.tyWord) && node.nodes[1].nodes.Count == 0)
+                {
+                    SynthCanidateFunctions scf = astSrc.evaluatingType.GetCanidateFunctions(node.nodes[1].root.fragment);
+                    TokenAST astPropose = new TokenAST(node.nodes[1].root, this, TokenASTType.ProposeMethod, scf, null, false, TokenAST.DataManifest.NoData, astSrc);
+                    return astPropose;
+                }
+
+                throw new SynthExceptionSyntax(node.root, "Unhandled dereference.");
             }
 
             if(node.root.Matches(TokenType.tyWord) == true)
@@ -2414,7 +2428,27 @@ namespace PxPre.SynthSyn
                     break;
 
                 case TokenASTType.CallMember:
-                    break;
+                    { 
+                        SynthFuncDecl fnInvoke = expr.synthObj.CastFuncDecl();
+                        if(fnInvoke == null)
+                            throw new SynthExceptionImpossible("Missing function for method AST processing.");
+
+                        if(fnInvoke.isStatic == true)
+                            throw new SynthExceptionImpossible("Attempting to call struct method with a method that is a static function.");
+
+                        if(expr.branches.Count == 0)
+                            throw new SynthExceptionImpossible("Attemptiong to call a struct method without an invoking object AST node.");
+
+                        ValueRef vrInvokObj = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
+
+                        // This isn't needed because the invoking object is already on the stack.
+                        // Althought this needs to be validated wtih the 'this' keyword when used as the
+                        // invoking object.
+                        //
+                        //vrInvokObj.PutLocalVarAddressOnStack(fnBuild);
+
+                        return BuildBSFunctionInvoke(fnInvoke, fnd, expr, wasmBuild, ctxBuilder, fnBuild);
+                    }
 
                 case TokenASTType.CallGlobalFn:
                     { 

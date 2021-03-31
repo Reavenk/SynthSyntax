@@ -549,7 +549,7 @@ namespace PxPre.SynthSyn
                 }
             }
 
-            SynthLog.Log($"Finished BreakApartParsedTokens for {this.functionName}.");
+            SynthLog.Log($"Finished BreakApartParsedTokens for {this.functionName}.\n");
         }
 
         public override void Validate_AfterTypeAlignment(int logIndent)

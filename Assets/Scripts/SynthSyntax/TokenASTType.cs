@@ -115,6 +115,7 @@ namespace PxPre.SynthSyn
         Compare_GreaterThanEq,
 
         DerefName,
+        ProposeMethod,
         CallMember,
         CallGlobalFn,
 
