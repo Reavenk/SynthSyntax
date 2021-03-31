@@ -328,6 +328,15 @@ namespace PxPre.SynthSyn
             if(nodes.Count == 0)
                 throw new SynthExceptionImpossible("Consolidating tree nodes with a count of 0.");
 
+            if(nodes[0].root.Matches(TokenType.tyWord, "return") == true)
+            { 
+                TokenTree ret = nodes[0];
+                nodes.RemoveAt(0);
+
+                ret.nodes.Add(ConsolidateTokenTree(nodes, scope, rootExpression));
+                return ret;
+            }
+
             if(nodes[0].root.MatchesSymbol("(") == true)
             { 
                 // TODO: Check for a cast here?

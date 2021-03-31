@@ -1,0 +1,47 @@
+// Test returning an intrinsic value from a method.
+// 
+// >> Name: "Struct Return intrinsic"
+// >> Results : {220, 53, 273}
+// 
+
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+struct TestStruct
+{
+	int a;
+	int b;
+	float c;
+	int8 d;
+	
+	TestStruct(int v)
+	{
+		// Implicit this dereference
+		a = v;
+		b = v * 2;
+		c = 3.3f;
+		d = 123;
+	}
+
+	int GetAMul(int x)
+	{
+		return this.a * x;
+	}
+
+	int GetBPlus(int plus)
+	{
+		return b + plus;
+	}
+}
+
+entry DoTest()
+{	
+	TestStruct ts = TestStruct(10);
+	
+	LogTest(ts.GetAMul(22));
+	LogTest(ts.GetBPlus(33));
+	LogTest(ts.GetAMul(22) + ts.GetBPlus(33));
+
+	EndTest();
+}

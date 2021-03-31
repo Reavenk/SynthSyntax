@@ -119,6 +119,13 @@ namespace PxPre.SynthSyn
         CallMember,
         CallGlobalFn,
 
+        // Not currently fully supported, but partially supported so that
+        // it can be parsed.
+        //
+        // TODO: Perform compile error checking to make sure functions with
+        // return values properly return.
+        ReturnValue,
+
         DefaultParam,
 
     }

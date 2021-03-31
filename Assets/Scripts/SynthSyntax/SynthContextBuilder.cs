@@ -587,6 +587,15 @@ namespace PxPre.SynthSyn
                     return new TokenAST(node.root, this, TokenASTType.GetThis, rootScope, rootScope, true, TokenAST.DataManifest.Procedural);
                 }
 
+                if(node.root.Matches("return") == true)
+                { 
+                    if(node.nodes.Count != 1)
+                        throw new SynthExceptionImpossible("return keyword expected exactly one AST expression node.");
+
+                    TokenAST astRet = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
+                    return new TokenAST(node.root, this, TokenASTType.ReturnValue, null, astRet.evaluatingType, astRet.hasAddress, TokenAST.DataManifest.Procedural, astRet);
+                }
+
                 // If it matches a known type, we've detected the token is attempting
                 // to declare a variable in local scope.
                 SynthType sty = function.GetType(node.root.fragment);
@@ -901,6 +910,12 @@ namespace PxPre.SynthSyn
                     }
 
                     caller.evaluatingType = reslvFn.returnType;
+
+                    if(caller.evaluatingType == null)
+                        caller.manifest = TokenAST.DataManifest.NoData;
+                    else
+                        caller.manifest = TokenAST.DataManifest.Procedural;
+
                     return caller;
                 }
             }
@@ -2439,14 +2454,8 @@ namespace PxPre.SynthSyn
                         if(expr.branches.Count == 0)
                             throw new SynthExceptionImpossible("Attemptiong to call a struct method without an invoking object AST node.");
 
-                        ValueRef vrInvokObj = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
-
-                        // This isn't needed because the invoking object is already on the stack.
-                        // Althought this needs to be validated wtih the 'this' keyword when used as the
-                        // invoking object.
-                        //
-                        //vrInvokObj.PutLocalVarAddressOnStack(fnBuild);
-
+                        // Call member is expected to contain the invoking object as fnBuild[0], and to put the
+                        // pointer on stack, so we just need to build the binary for a normal function call.
                         return BuildBSFunctionInvoke(fnInvoke, fnd, expr, wasmBuild, ctxBuilder, fnBuild);
                     }
 
@@ -2532,6 +2541,23 @@ namespace PxPre.SynthSyn
                             this.BuildBSFunctionDirectInvoke(fnDestr, wasmBuild, fnBuild);
                         }
                         return new ValueRef(ValueLoc.NoValue, -1, -1, null);
+                    }
+
+                case TokenASTType.ReturnValue:
+                    {
+                        if(expr.branches.Count != 1)
+                            throw new SynthExceptionImpossible("Return value missing the value node.");
+
+                        ValueRef vrRet = BuildBSFunctionExpression( fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
+
+                        if(vrRet.valLoc != ValueLoc.ValueOnStack)
+                            throw new SynthExceptionCompile($"Cannot perform return location where return value ends up at location {vrRet.valLoc}");
+
+                        if(vrRet.varType == null || vrRet.varType.intrinsic == false)
+                            throw new SynthExceptionCompile("Attempting to return non-intrinsic value.");
+
+                        vrRet.PutInstrinsicValueOnStack(fnBuild);
+                        return vrRet;
                     }
             }
 

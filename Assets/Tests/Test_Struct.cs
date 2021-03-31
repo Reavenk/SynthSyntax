@@ -55,12 +55,13 @@ namespace Tests
         [Test]
         public void Test_09_MethodReturnIntrinsic()
         {
-            UnitTest_Utils.PerformContainedTest("SynthScripts/Struct/Vali_StructMethodSelfMod.synsyn");
+            UnitTest_Utils.PerformContainedTest("SynthScripts/Struct/Vali_StructMethodReturnInstrinsic.synsyn");
         }
 
         [Test]
         public void Test_10_MethodReturnMemory()
         {
+            UnitTest_Utils.PerformContainedTest("SynthScripts/Struct/Vali_StructMethodReturnMemory.synsyn");
             throw new System.Exception("Unimplemented!");
         }
     }
