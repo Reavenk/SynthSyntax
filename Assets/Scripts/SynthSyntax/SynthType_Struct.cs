@@ -38,10 +38,10 @@ namespace PxPre.SynthSyn
 
             // TODO: Check that the name is available
             if (tokens[1].Matches(TokenType.tyWord) == false)
-                throw new System.Exception(); // TODO: Err msg
+                throw new SynthExceptionSyntax(tokens[1], "Missing struct name.");
 
             if (tokens[2].Matches(TokenType.tySymbol, "{") == false)
-                throw new System.Exception(); // TODO: Err msg
+                throw new SynthExceptionSyntax(tokens[2], "Missing struct body entry.");
 
             int idx = 2;
             Parser.MovePastScopeTSemi(ref idx, tokens);
