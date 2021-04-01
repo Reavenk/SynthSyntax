@@ -1,5 +1,9 @@
+// Testing cast float->int.
 //
-// >> Name: "Cast Float->Int 002"
+// This tests the basics of pulling the float from local
+// variable scope before casting it. 
+// 
+// >> Name: "Cast Float->Int 003"
 // >> Results: {20}
 //
 

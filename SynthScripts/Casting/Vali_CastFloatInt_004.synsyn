@@ -1,5 +1,10 @@
+// Test cast float->int.
 //
-// >> Name: "Cast Float->Int 002"
+// An extension of test 003, where values are pulled from
+// local variable scope, but the value is created from an
+// expression bounded with parenthesis.
+//
+// >> Name: "Cast Float->Int 004"
 // >> Results: {167}
 //
 

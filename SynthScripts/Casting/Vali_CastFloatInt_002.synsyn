@@ -1,3 +1,7 @@
+// Testing cast float->int.
+//
+// This is a simple test of casting expressions encapsulated 
+// in parenthesis.
 //
 // >> Name: "Cast Float->Int 002"
 // >> Results: {11}

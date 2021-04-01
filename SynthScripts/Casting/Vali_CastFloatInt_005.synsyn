@@ -1,5 +1,10 @@
+// Testing cast float->int.
+// 
+// A change of the expression from 004 to test the order of operations
+// for casting, along with pulling a float value from local variable 
+// scope.
 //
-// >> Name: "Cast Float->Int 002"
+// >> Name: "Cast Float->Int 005"
 // >> Results: {120}
 //
 
