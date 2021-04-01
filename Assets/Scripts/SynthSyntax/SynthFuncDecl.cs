@@ -112,7 +112,7 @@ namespace PxPre.SynthSyn
 
         // TODO: Reorganize correctly (refactor)
         // The AST for the function
-        public TokenAST ast;
+        public AST ast;
 
         // TODO: Reorganize correctly (refactor)
         // The WASM bytecode for the function.

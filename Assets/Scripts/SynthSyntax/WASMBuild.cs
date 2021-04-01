@@ -599,14 +599,14 @@ namespace PxPre.SynthSyn
             // NOTE: For now functions are non-typed (in the SynthSyn language) and 
             // are non addressable.
             fnd.ast =
-                new TokenAST(
+                new AST(
                     fnd.declPhrase[0],
                     builder,
-                    TokenASTType.FunctionDecl,
+                    ASTOp.FunctionDecl,
                     fnd,
                     null,
                     false,
-                    TokenAST.DataManifest.NoData);
+                    AST.DataManifest.NoData);
 
             SynthLog.Log($"Building function AST for {fnd.functionName}.");
             SynthLog.Log("");
@@ -632,7 +632,7 @@ namespace PxPre.SynthSyn
                 if (fnd.isStatic == false)
                     invokingScope = fnd.GetStructScope();
 
-                TokenAST exprAST = builder.ProcessFunctionExpression(builders, this, invokingScope, fnd, rootLineNode);
+                AST exprAST = builder.ProcessFunctionExpression(builders, this, invokingScope, fnd, rootLineNode);
                 if (exprAST == null)
                 {
                     // We shouldn't have received null, we should have thrown before this
@@ -640,7 +640,7 @@ namespace PxPre.SynthSyn
                 }
                 fnd.ast.branches.Add(exprAST);
             }
-            fnd.ast.branches.Add(new TokenAST(new Token(), builder, TokenASTType.EndScope, builder, null, false, TokenAST.DataManifest.NoData));
+            fnd.ast.branches.Add(new AST(new Token(), builder, ASTOp.EndScope, builder, null, false, AST.DataManifest.NoData));
 
             SynthLog.Log("");
             SynthLog.Log($"Encountered {builders.Count} nested scopes.");

@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace PxPre.SynthSyn
 {
-    public enum TokenASTType
+    public enum ASTOp
     { 
         SetValue,
 

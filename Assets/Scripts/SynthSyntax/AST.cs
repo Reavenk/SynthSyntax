@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace PxPre.SynthSyn
 {
-    public class TokenAST
+    public class AST
     {
         /// <summary>
         /// How is the data represented?
@@ -79,7 +79,7 @@ namespace PxPre.SynthSyn
             throw new SynthExceptionImpossible("Attempted cast the manifest of unknown type.");
         }
 
-        public static DataManifest CombineManifests(TokenAST a, TokenAST b)
+        public static DataManifest CombineManifests(AST a, AST b)
         { 
             return CombineManifests(a.manifest, b.manifest);
         }
@@ -88,18 +88,18 @@ namespace PxPre.SynthSyn
         public SynthObj synthObj;
         public SynthType evaluatingType;
         public Token token;
-        public TokenASTType astType;
-        public List<TokenAST> branches;
+        public ASTOp astType;
+        public List<AST> branches;
         public SynthContextBuilder builder;
         public DataManifest manifest;
 
-        public void SetBranches(params TokenAST [] tas)
+        public void SetBranches(params AST [] tas)
         { 
-            this.branches = new List<TokenAST>();
+            this.branches = new List<AST>();
             this.branches.AddRange(tas);
         }
 
-        public TokenAST(Token t, SynthContextBuilder builder, TokenASTType ast, SynthObj so, SynthType sevty, bool hasAddress, DataManifest manifest, params TokenAST [] branches)
+        public AST(Token t, SynthContextBuilder builder, ASTOp ast, SynthObj so, SynthType sevty, bool hasAddress, DataManifest manifest, params AST [] branches)
         { 
             this.builder        = builder;
             this.synthObj       = so;
@@ -109,15 +109,15 @@ namespace PxPre.SynthSyn
             this.hasAddress     = hasAddress;
             this.manifest       = manifest;
 
-            this.branches = new List<TokenAST>(); // Should we always allocate this?
+            this.branches = new List<AST>(); // Should we always allocate this?
             if(branches != null && branches.Length > 0)
                 this.branches.AddRange(branches);
         }
 
-        public TokenAST Clone(bool deep = false)
+        public AST Clone(bool deep = false)
         { 
-            TokenAST ret = 
-                new TokenAST(
+            AST ret = 
+                new AST(
                     this.token, 
                     this.builder,
                     this.astType, 
@@ -128,7 +128,7 @@ namespace PxPre.SynthSyn
 
             if(deep == true)
             { 
-                foreach(TokenAST ast in branches)
+                foreach(AST ast in branches)
                     ret.branches.Add(ast.Clone());
             }
 
@@ -163,7 +163,7 @@ namespace PxPre.SynthSyn
             {
                 sb.Append($"{indent}{{\n");
 
-                foreach(TokenAST ta in this.branches)
+                foreach(AST ta in this.branches)
                     ta._DumpDiagnostic(sb, depth + 1);
 
                 sb.Append($"{indent}}}\n");

@@ -10,9 +10,9 @@ namespace PxPre.SynthSyn
         public struct OperatorInfo
         {
             public string tokStr;
-            public TokenASTType intrinsicOperator;
+            public ASTOp intrinsicOperator;
 
-            public OperatorInfo(string tokStr, TokenASTType intOp)
+            public OperatorInfo(string tokStr, ASTOp intOp)
             {
                 this.tokStr = tokStr;
                 this.intrinsicOperator = intOp;
@@ -51,47 +51,47 @@ namespace PxPre.SynthSyn
 
         List<ValueRef> allLocalVars = new List<ValueRef>();
 
-        List<TokenAST> asts = new List<TokenAST>();
+        List<AST> asts = new List<AST>();
 
         OperatorInfo[] OperatorsAssign =
             new OperatorInfo[]{
-                new OperatorInfo("=",   TokenASTType.SetValue),
-                new OperatorInfo("+=",  TokenASTType.SetAfterAdd),
-                new OperatorInfo("-=",  TokenASTType.SetAfterSub),
-                new OperatorInfo("*=",  TokenASTType.SetAfterMul),
-                new OperatorInfo("/=",  TokenASTType.SetAfterDiv),
-                new OperatorInfo("%=",  TokenASTType.SetAfterMod),
-                new OperatorInfo("|=",  TokenASTType.SetAfterBitOr),
-                new OperatorInfo("&=",  TokenASTType.SetAfterBitAnd),
-                new OperatorInfo("^=",  TokenASTType.SetAfterBitXor),
-                new OperatorInfo(">>=", TokenASTType.SetAfterShiftL),
-                new OperatorInfo("<<=", TokenASTType.SetAfterShiftR) };
+                new OperatorInfo("=",   ASTOp.SetValue),
+                new OperatorInfo("+=",  ASTOp.SetAfterAdd),
+                new OperatorInfo("-=",  ASTOp.SetAfterSub),
+                new OperatorInfo("*=",  ASTOp.SetAfterMul),
+                new OperatorInfo("/=",  ASTOp.SetAfterDiv),
+                new OperatorInfo("%=",  ASTOp.SetAfterMod),
+                new OperatorInfo("|=",  ASTOp.SetAfterBitOr),
+                new OperatorInfo("&=",  ASTOp.SetAfterBitAnd),
+                new OperatorInfo("^=",  ASTOp.SetAfterBitXor),
+                new OperatorInfo(">>=", ASTOp.SetAfterShiftL),
+                new OperatorInfo("<<=", ASTOp.SetAfterShiftR) };
 
         OperatorInfo[] OperatorsCmp =
             new OperatorInfo[]{
-                new OperatorInfo("==",  TokenASTType.Compare_Eq),
-                new OperatorInfo("!=",  TokenASTType.Compare_NEq),
-                new OperatorInfo(">",   TokenASTType.Compare_GreaterThan),
-                new OperatorInfo(">=",  TokenASTType.Compare_GreaterThanEq),
-                new OperatorInfo("<",   TokenASTType.Compare_LessThan),
-                new OperatorInfo("<=",  TokenASTType.Compare_GreaterThanEq)};
+                new OperatorInfo("==",  ASTOp.Compare_Eq),
+                new OperatorInfo("!=",  ASTOp.Compare_NEq),
+                new OperatorInfo(">",   ASTOp.Compare_GreaterThan),
+                new OperatorInfo(">=",  ASTOp.Compare_GreaterThanEq),
+                new OperatorInfo("<",   ASTOp.Compare_LessThan),
+                new OperatorInfo("<=",  ASTOp.Compare_GreaterThanEq)};
 
         OperatorInfo[] OperatorsBitWise =
             new OperatorInfo[]{
-                new OperatorInfo("|",   TokenASTType.BitOr),
-                new OperatorInfo("&",   TokenASTType.BitAnd),
-                new OperatorInfo("^",   TokenASTType.BitXor),
-                new OperatorInfo("~",   TokenASTType.BitInv),
-                new OperatorInfo(">>",  TokenASTType.BitShiftL),
-                new OperatorInfo("<<",  TokenASTType.BitShiftR)};
+                new OperatorInfo("|",   ASTOp.BitOr),
+                new OperatorInfo("&",   ASTOp.BitAnd),
+                new OperatorInfo("^",   ASTOp.BitXor),
+                new OperatorInfo("~",   ASTOp.BitInv),
+                new OperatorInfo(">>",  ASTOp.BitShiftL),
+                new OperatorInfo("<<",  ASTOp.BitShiftR)};
 
         OperatorInfo[] OperatorsMath =
             new OperatorInfo[]{
-                new OperatorInfo("+",   TokenASTType.Add),
-                new OperatorInfo("-",   TokenASTType.Sub),
-                new OperatorInfo("*",   TokenASTType.Mul),
-                new OperatorInfo("/",   TokenASTType.Div),
-                new OperatorInfo("%",   TokenASTType.Mod)};
+                new OperatorInfo("+",   ASTOp.Add),
+                new OperatorInfo("-",   ASTOp.Sub),
+                new OperatorInfo("*",   ASTOp.Mul),
+                new OperatorInfo("/",   ASTOp.Div),
+                new OperatorInfo("%",   ASTOp.Mod)};
 
         public readonly SynthContextBuilder parent;
 
@@ -101,9 +101,9 @@ namespace PxPre.SynthSyn
         }
 
 
-        TokenAST ProcessLogic(SynthScope scope, TokenTree tt)
+        AST ProcessLogic(SynthScope scope, TokenTree tt)
         { 
-            TokenAST ast = ProcessMathTree(scope, tt);
+            AST ast = ProcessMathTree(scope, tt);
             if(ast != null)
                 return ast;
 
@@ -229,7 +229,7 @@ namespace PxPre.SynthSyn
             this.totalMemoryStackBytes += memBase;
         }
 
-        TokenAST ProcessMathTree(SynthScope scope, TokenTree tt)
+        AST ProcessMathTree(SynthScope scope, TokenTree tt)
         {
             // TODO: Is this a duplicate of ProcessMathOperators()?
 
@@ -237,8 +237,8 @@ namespace PxPre.SynthSyn
             {
                 if (tt.root.MatchesSymbol(oi.tokStr) == true)
                 {
-                    TokenAST left = ProcessLogic(scope, tt.nodes[0]);
-                    TokenAST right = ProcessLogic(scope, tt.nodes[1]);
+                    AST left = ProcessLogic(scope, tt.nodes[0]);
+                    AST right = ProcessLogic(scope, tt.nodes[1]);
 
                     if (
                         left.evaluatingType.intrinsic == true &&
@@ -246,14 +246,14 @@ namespace PxPre.SynthSyn
                     {
                         EnsureIntrinsicCompatibility(ref left, ref right, true);
 
-                        return new TokenAST(
+                        return new AST(
                             tt.root, 
                             this, 
                             oi.intrinsicOperator, 
                             null, 
                             scope.GetType("bool"), 
                             false,
-                            TokenAST.CombineManifests(left, right), 
+                            AST.CombineManifests(left, right), 
                             left, 
                             right);
                     }
@@ -267,14 +267,14 @@ namespace PxPre.SynthSyn
 
         
 
-        TokenAST ProcessComparison(SynthScope scope, TokenTree tt)
+        AST ProcessComparison(SynthScope scope, TokenTree tt)
         {
             foreach(OperatorInfo oi in OperatorsCmp)
             {
                 if (tt.root.MatchesSymbol(oi.tokStr) == true)
                 {
-                    TokenAST left = ProcessLogic(scope, tt.nodes[0]);
-                    TokenAST right = ProcessLogic(scope, tt.nodes[1]);
+                    AST left = ProcessLogic(scope, tt.nodes[0]);
+                    AST right = ProcessLogic(scope, tt.nodes[1]);
 
                     if (
                         left.evaluatingType.intrinsic == true &&
@@ -282,14 +282,14 @@ namespace PxPre.SynthSyn
                     {
                         EnsureIntrinsicCompatibility(ref left, ref right, true);
 
-                        return new TokenAST(
+                        return new AST(
                             tt.root, 
                             this, 
                             oi.intrinsicOperator, 
                             null, 
                             scope.GetType("bool"), 
                             false,
-                            TokenAST.CombineManifests(left, right), 
+                            AST.CombineManifests(left, right), 
                             left, 
                             right);
                     }
@@ -303,14 +303,14 @@ namespace PxPre.SynthSyn
 
         
 
-        TokenAST ProcessBitOperators(SynthScope scope, TokenTree tt)
+        AST ProcessBitOperators(SynthScope scope, TokenTree tt)
         {
             foreach (OperatorInfo oi in OperatorsBitWise)
             {
                 if (tt.root.MatchesSymbol(oi.tokStr) == true)
                 {
-                    TokenAST left = ProcessLogic(scope, tt.nodes[0]);
-                    TokenAST right = ProcessLogic(scope, tt.nodes[1]);
+                    AST left = ProcessLogic(scope, tt.nodes[0]);
+                    AST right = ProcessLogic(scope, tt.nodes[1]);
 
                     if (
                         left.evaluatingType.intrinsic == true &&
@@ -318,14 +318,14 @@ namespace PxPre.SynthSyn
                     {
                         EnsureIntrinsicCompatibility(ref left, ref right, true);
 
-                        return new TokenAST(
+                        return new AST(
                             tt.root, 
                             this, 
                             oi.intrinsicOperator, 
                             null, 
                             left.evaluatingType, 
                             false,
-                            TokenAST.CombineManifests(left, right), 
+                            AST.CombineManifests(left, right), 
                             left, 
                             right);
                     }
@@ -337,14 +337,14 @@ namespace PxPre.SynthSyn
             return null;
         }
 
-        TokenAST ProcessMathOperators(SynthScope scope, TokenTree tt)
+        AST ProcessMathOperators(SynthScope scope, TokenTree tt)
         {
             foreach (OperatorInfo oi in OperatorsBitWise)
             {
                 if (tt.root.MatchesSymbol(oi.tokStr) == true)
                 {
-                    TokenAST left = ProcessLogic(scope, tt.nodes[0]);
-                    TokenAST right = ProcessLogic(scope, tt.nodes[1]);
+                    AST left = ProcessLogic(scope, tt.nodes[0]);
+                    AST right = ProcessLogic(scope, tt.nodes[1]);
 
                     if (
                         left.evaluatingType.intrinsic == true &&
@@ -352,13 +352,13 @@ namespace PxPre.SynthSyn
                     {
                         EnsureIntrinsicCompatibility(ref left, ref right, true);
 
-                        return new TokenAST(
+                        return new AST(
                             tt.root, 
                             this, 
                             oi.intrinsicOperator, 
                             null, left.evaluatingType, 
                             false,
-                            TokenAST.CombineManifests(left, right), 
+                            AST.CombineManifests(left, right), 
                             left, 
                             right);
                     }
@@ -376,26 +376,26 @@ namespace PxPre.SynthSyn
         /// <param name="scope"></param>
         /// <param name="tt"></param>
         /// <returns></returns>
-        TokenAST ProcessIntrinsic(SynthScope scope, TokenTree tt)
+        AST ProcessIntrinsic(SynthScope scope, TokenTree tt)
         {
             // TODO: Is this function redundant compared to ProcessFunctionExpression()?
             // Check if this should be removed.
 
-            TokenAST ret = null;
+            AST ret = null;
 
             switch(tt.root.type)
             { 
                 case TokenType.tyDouble:
-                    return new TokenAST(tt.root, this, TokenASTType.DeclFloat64, null, scope.GetType("double"), false, TokenAST.DataManifest.ValueConst);
+                    return new AST(tt.root, this, ASTOp.DeclFloat64, null, scope.GetType("double"), false, AST.DataManifest.ValueConst);
 
                 case TokenType.tyFloat:
-                    return new TokenAST(tt.root, this, TokenASTType.DeclFloat, null, scope.GetType("double"), false, TokenAST.DataManifest.ValueConst);
+                    return new AST(tt.root, this, ASTOp.DeclFloat, null, scope.GetType("double"), false, AST.DataManifest.ValueConst);
 
                 case TokenType.tyInt:
-                    return new TokenAST(tt.root, this, TokenASTType.DeclSInt, null, scope.GetType("int"), false, TokenAST.DataManifest.ValueConst);
+                    return new AST(tt.root, this, ASTOp.DeclSInt, null, scope.GetType("int"), false, AST.DataManifest.ValueConst);
 
                 case TokenType.tyLong:
-                    return new TokenAST(tt.root, this, TokenASTType.DeclSInt64, null, scope.GetType("int64"), false, TokenAST.DataManifest.ValueConst);
+                    return new AST(tt.root, this, ASTOp.DeclSInt64, null, scope.GetType("int64"), false, AST.DataManifest.ValueConst);
             }
 
             if(ret == null)
@@ -407,7 +407,7 @@ namespace PxPre.SynthSyn
             return ret;
         }
 
-        public TokenAST GenerateOperatorAST(string operatorName, Token tokOp, TokenAST left, TokenAST right)
+        public AST GenerateOperatorAST(string operatorName, Token tokOp, AST left, AST right)
         {
             // First check non-reversible entries.
             SynthFuncDecl sfd = 
@@ -418,14 +418,14 @@ namespace PxPre.SynthSyn
 
             if (sfd != null)
             {
-                return new TokenAST(
+                return new AST(
                     tokOp, 
                     this, 
-                    TokenASTType.CallMember, 
+                    ASTOp.CallMember, 
                     sfd, 
                     sfd.returnType, 
                     false,
-                    TokenAST.CombineManifests(left, right), 
+                    AST.CombineManifests(left, right), 
                     left, 
                     right);
             }
@@ -454,14 +454,14 @@ namespace PxPre.SynthSyn
             sfd = left.evaluatingType.GetOperator(operatorName, left.evaluatingType, SynthScope.OperatorReversing.OnlyReversible);
             if (sfd != null)
             {
-                return new TokenAST(
+                return new AST(
                     tokOp, 
                     this, 
-                    TokenASTType.CallMember, 
+                    ASTOp.CallMember, 
                     sfd, 
                     sfd.returnType, 
                     false, 
-                    TokenAST.DataManifest.Procedural, 
+                    AST.DataManifest.Procedural, 
                     right, 
                     left);
             }
@@ -483,7 +483,7 @@ namespace PxPre.SynthSyn
         /// <remarks>Currently if the function fails, either a null will be returned or an exception 
         /// will be thrown. It is expected in the future for nulls to never be thrown, and any error
         /// or null result to end with a throw.</remarks>
-        public TokenAST ProcessFunctionExpression(
+        public AST ProcessFunctionExpression(
             List<SynthContextBuilder> regCtxBuilders,
             WASMBuild build, 
             SynthScope invokingContext, 
@@ -498,34 +498,34 @@ namespace PxPre.SynthSyn
             if(node.root.Matches(TokenType.tyBool) == true)
             {
                 EnsureNoTreeChildNodes(node);
-                return new TokenAST(node.root, this, TokenASTType.DeclBool, null, build.rootContext.GetType("bool"), false, TokenAST.DataManifest.ValueConst);
+                return new AST(node.root, this, ASTOp.DeclBool, null, build.rootContext.GetType("bool"), false, AST.DataManifest.ValueConst);
             }
             
             if(node.root.Matches(TokenType.tyInt) == true)
             {
                 EnsureNoTreeChildNodes(node);
                 // All ints are signed by default - they can be casted with the cast optimized out later.
-                return new TokenAST(node.root, this, TokenASTType.DeclSInt, null, build.rootContext.GetType("int"), false, TokenAST.DataManifest.ValueConst);
+                return new AST(node.root, this, ASTOp.DeclSInt, null, build.rootContext.GetType("int"), false, AST.DataManifest.ValueConst);
             }
 
             if(node.root.Matches(TokenType.tyFloat) == true)
             {
                 EnsureNoTreeChildNodes(node);
-                return new TokenAST(node.root, this, TokenASTType.DeclFloat, null, build.rootContext.GetType("float"), false, TokenAST.DataManifest.ValueConst);
+                return new AST(node.root, this, ASTOp.DeclFloat, null, build.rootContext.GetType("float"), false, AST.DataManifest.ValueConst);
             }
 
             if(node.root.Matches(TokenType.tyDouble) == true)
             {
                 EnsureNoTreeChildNodes(node);
 
-                return new TokenAST(
+                return new AST(
                     node.root, 
                     this, 
-                    TokenASTType.DeclFloat64, 
+                    ASTOp.DeclFloat64, 
                     null, 
                     build.rootContext.GetType("double"), 
                     false, 
-                    TokenAST.DataManifest.ValueConst);
+                    AST.DataManifest.ValueConst);
             }
 
             if(node.root.Matches(TokenType.tyString) == true)
@@ -534,14 +534,14 @@ namespace PxPre.SynthSyn
                 build.stringRepo.RegisterString(node.root.fragment);
 
                 // Placeholder string, declaring strings currently not supported.
-                return new TokenAST(
+                return new AST(
                     node.root, 
                     this, 
-                    TokenASTType.DeclString, 
+                    ASTOp.DeclString, 
                     null, 
                     build.rootContext.GetType("string"), 
                     false, 
-                    TokenAST.DataManifest.ValueConst);
+                    AST.DataManifest.ValueConst);
             }
 
             if(node.root.MatchesSymbol(".") == true)
@@ -549,7 +549,7 @@ namespace PxPre.SynthSyn
                 if(node.nodes.Count != 2)
                     throw new SynthExceptionImpossible(". operator expected two nodes.");
 
-                TokenAST astSrc = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
+                AST astSrc = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
 
                 if(node.nodes[1].root.Matches(TokenType.tyWord) == false || node.nodes[1].nodes.Count != 0)
                     throw new SynthExceptionSyntax(node.nodes[1].root, "Invalid dereference type.");
@@ -559,23 +559,23 @@ namespace PxPre.SynthSyn
                 if(svv != null)
                 {
                     // TODO: Do we support const member variables?
-                        TokenAST astDeref = 
-                        new TokenAST(
+                        AST astDeref = 
+                        new AST(
                             node.nodes[1].root, 
                             this, 
-                            TokenASTType.DerefName, 
+                            ASTOp.DerefName, 
                             svv, 
                             svv.type, 
                             false, 
-                            TokenAST.DataManifest.NoData);
+                            AST.DataManifest.NoData);
 
-                    return new TokenAST(
+                    return new AST(
                         node.root, 
                         this, 
-                        TokenASTType.GetMemberVar, 
+                        ASTOp.GetMemberVar, 
                         svv, svv.type, 
                         true, 
-                        TokenAST.DataManifest.Procedural,
+                        AST.DataManifest.Procedural,
                         astSrc,
                         astDeref);
                 }
@@ -585,7 +585,7 @@ namespace PxPre.SynthSyn
                 if(node.nodes[1].root.Matches(TokenType.tyWord) && node.nodes[1].nodes.Count == 0)
                 {
                     SynthCanidateFunctions scf = astSrc.evaluatingType.GetCanidateFunctions(node.nodes[1].root.fragment);
-                    TokenAST astPropose = new TokenAST(node.nodes[1].root, this, TokenASTType.ProposeMethod, scf, null, false, TokenAST.DataManifest.NoData, astSrc);
+                    AST astPropose = new AST(node.nodes[1].root, this, ASTOp.ProposeMethod, scf, null, false, AST.DataManifest.NoData, astSrc);
                     return astPropose;
                 }
 
@@ -608,7 +608,7 @@ namespace PxPre.SynthSyn
                     if(styCast == null)
                         throw new SynthExceptionSyntax(node.root, "Could not find existed casted type.");
 
-                    TokenAST astCast = 
+                    AST astCast = 
                         ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
 
                     // Having an AST type for each instrinsic cast seems a little bloated. 
@@ -624,7 +624,7 @@ namespace PxPre.SynthSyn
                         case "int64":
                         case "float":
                         case "float64":
-                            return new TokenAST(node.root, this, TokenASTType.ExplicitCast, null, styCast, false, TokenAST.CastManifest(astCast.manifest), astCast);
+                            return new AST(node.root, this, ASTOp.ExplicitCast, null, styCast, false, AST.CastManifest(astCast.manifest), astCast);
 
                         case "bool":
                         default:
@@ -638,7 +638,7 @@ namespace PxPre.SynthSyn
                         throw new SynthExceptionSyntax(node.root, "this cannot be used in a static function.");
 
                     SynthType_Struct rootScope = function.GetStructScope();
-                    return new TokenAST(node.root, this, TokenASTType.GetThis, rootScope, rootScope, true, TokenAST.DataManifest.Procedural);
+                    return new AST(node.root, this, ASTOp.GetThis, rootScope, rootScope, true, AST.DataManifest.Procedural);
                 }
 
                 if(node.root.Matches("return") == true)
@@ -646,8 +646,8 @@ namespace PxPre.SynthSyn
                     if(node.nodes.Count != 1)
                         throw new SynthExceptionImpossible("return keyword expected exactly one AST expression node.");
 
-                    TokenAST astRet = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
-                    return new TokenAST(node.root, this, TokenASTType.ReturnValue, null, astRet.evaluatingType, astRet.hasAddress, TokenAST.DataManifest.Procedural, astRet);
+                    AST astRet = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
+                    return new AST(node.root, this, ASTOp.ReturnValue, null, astRet.evaluatingType, astRet.hasAddress, AST.DataManifest.Procedural, astRet);
                 }
 
                 // If it matches a known type, we've detected the token is attempting
@@ -664,16 +664,16 @@ namespace PxPre.SynthSyn
 
                     this.AddLocalVariable(node.root, sty, node.nodes[0].root.fragment);
 
-                    TokenAST astDeclVar = 
-                        new TokenAST(node.root, this, TokenASTType.RegisterLocalVar, null, sty, true, TokenAST.DataManifest.NoData);
+                    AST astDeclVar = 
+                        new AST(node.root, this, ASTOp.RegisterLocalVar, null, sty, true, AST.DataManifest.NoData);
 
-                    TokenAST astVarName = 
-                        new TokenAST(node.nodes[0].root, this, TokenASTType.RegisterLocalVarName, null, null, false, TokenAST.DataManifest.NoData);
+                    AST astVarName = 
+                        new AST(node.nodes[0].root, this, ASTOp.RegisterLocalVarName, null, null, false, AST.DataManifest.NoData);
                     
                     astDeclVar.branches.Add(astVarName);
                     if(node.nodes.Count > 1)
                     {
-                        TokenAST astVarInit = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[1]);
+                        AST astVarInit = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[1]);
                         astDeclVar.branches.Add(astVarInit);
 
                         if(node.nodes.Count > 2)
@@ -685,43 +685,43 @@ namespace PxPre.SynthSyn
                 // Compiler constant macros
                 if(node.root.fragment == "__LINE__")
                 {
-                    return new TokenAST(
+                    return new AST(
                         new Token(
                             node.root.line, 
                             node.root.line.ToString(), 
                             TokenType.tyInt), 
                         this, 
-                        TokenASTType.DeclSInt, 
+                        ASTOp.DeclSInt, 
                         null, 
                         build.rootContext.GetType("int"), 
                         false,
-                        TokenAST.DataManifest.ValueConst);
+                        AST.DataManifest.ValueConst);
                 }
 
                 ValueRef localVR = this.GetLocalVariable(node.root.fragment);
                 if(localVR != null)
-                    return new TokenAST(node.root, this, TokenASTType.GetLocalVar, localVR, localVR.varType, true, TokenAST.DataManifest.Procedural);
+                    return new AST(node.root, this, ASTOp.GetLocalVar, localVR, localVR.varType, true, AST.DataManifest.Procedural);
 
                 SynthVarValue svv = function.GetVar(node.root.fragment);
                 if(svv != null)
                 {
                     if(svv.varLoc == SynthVarValue.VarLocation.Member)
                     {
-                        TokenAST astSrc = new TokenAST(node.root, this, TokenASTType.GetThis, function.GetStructScope(), function.GetStructScope(), false, TokenAST.DataManifest.Procedural);
-                        TokenAST astDeref = new TokenAST(node.root, this, TokenASTType.DerefName, null, svv.type, false, TokenAST.DataManifest.Procedural);
-                        return new TokenAST(node.root, this, TokenASTType.GetMemberVar, svv, svv.type, true, TokenAST.DataManifest.Procedural, astSrc, astDeref);
+                        AST astSrc = new AST(node.root, this, ASTOp.GetThis, function.GetStructScope(), function.GetStructScope(), false, AST.DataManifest.Procedural);
+                        AST astDeref = new AST(node.root, this, ASTOp.DerefName, null, svv.type, false, AST.DataManifest.Procedural);
+                        return new AST(node.root, this, ASTOp.GetMemberVar, svv, svv.type, true, AST.DataManifest.Procedural, astSrc, astDeref);
                     }
                     else if(svv.varLoc == SynthVarValue.VarLocation.Parameter)
                     {
-                        return new TokenAST(node.root, this, TokenASTType.GetParamVar, svv, svv.type, true, TokenAST.DataManifest.Procedural);
+                        return new AST(node.root, this, ASTOp.GetParamVar, svv, svv.type, true, AST.DataManifest.Procedural);
                     }
                     else if(svv.varLoc == SynthVarValue.VarLocation.Local)
                     {
-                        return new TokenAST(node.root, this, TokenASTType.GetLocalVar, svv, svv.type, true, TokenAST.DataManifest.Procedural);
+                        return new AST(node.root, this, ASTOp.GetLocalVar, svv, svv.type, true, AST.DataManifest.Procedural);
                     }
                     else if(svv.varLoc == SynthVarValue.VarLocation.Static)
                     {
-                        return new TokenAST(node.root, this, TokenASTType.GetGlobalVar, svv, svv.type, true, TokenAST.DataManifest.Procedural);
+                        return new AST(node.root, this, ASTOp.GetGlobalVar, svv, svv.type, true, AST.DataManifest.Procedural);
                     }
                     //TokenAST astDeref =
                     //new TokenAST(
@@ -750,7 +750,7 @@ namespace PxPre.SynthSyn
 
                 SynthCanidateFunctions canFns = function.GetCanidateFunctions(node.root.fragment);
                 if(canFns == null || canFns.functions.Count > 0)
-                    return new TokenAST(node.root, this, TokenASTType.GetFunction, canFns, null, false, TokenAST.DataManifest.NoData);
+                    return new AST(node.root, this, ASTOp.GetFunction, canFns, null, false, AST.DataManifest.NoData);
 
                 // TODO: Getting scope
             }
@@ -773,11 +773,11 @@ namespace PxPre.SynthSyn
                     throw new SynthExceptionImpossible("if statement needs at least two trees, one for the predicate and one for the body statements.");
                 }
 
-                TokenAST pred = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
+                AST pred = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
                 if(pred.evaluatingType == null || pred.evaluatingType.typeName != "bool")
                     throw new SynthExceptionSyntax(node.nodes[0].root, "If statement predicate did not evaluate to a bool.");
 
-                TokenAST astIf = new TokenAST(node.root, this, TokenASTType.IfStatement, null, null, false, TokenAST.DataManifest.NoData, pred);
+                AST astIf = new AST(node.root, this, ASTOp.IfStatement, null, null, false, AST.DataManifest.NoData, pred);
 
                 for(int i = 1; i < node.nodes.Count; ++i)
                     astIf.branches.Add(ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[i]));
@@ -796,11 +796,11 @@ namespace PxPre.SynthSyn
                     throw new SynthExceptionImpossible("while statement needs at least two trees, one for the predicate and one for the body statements.");
                 }
 
-                TokenAST pred = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
+                AST pred = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
                 if(pred.evaluatingType == null || pred.evaluatingType.typeName != "bool")
                     throw new SynthExceptionSyntax(node.nodes[0].root, "While statement predicate did not evaludate to a bool.");
 
-                TokenAST astWhile = new TokenAST(node.root, this, TokenASTType.WhileStatement, null, null, false, TokenAST.DataManifest.NoData, pred);
+                AST astWhile = new AST(node.root, this, ASTOp.WhileStatement, null, null, false, AST.DataManifest.NoData, pred);
 
                 for(int i = 1; i < node.nodes.Count; ++i)
                     astWhile.branches.Add(ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[i]));
@@ -814,11 +814,11 @@ namespace PxPre.SynthSyn
                     throw new SynthExceptionImpossible("dowhile statement needs at least two trees, one for the body statements and one for the continue predicate.");
 
                 TokenTree ttLast = node.nodes[node.nodes.Count - 1];
-                TokenAST pred = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, ttLast);
+                AST pred = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, ttLast);
                 if(pred.evaluatingType == null || pred.evaluatingType.typeName != "bool")
                     throw new SynthExceptionSyntax(ttLast.root, "dowhile statement predicate did not evaluate to a bool.");
 
-                TokenAST astDoWhile = new TokenAST(node.root, this, TokenASTType.DoWhileStatement, null, null, false, TokenAST.DataManifest.NoData);
+                AST astDoWhile = new AST(node.root, this, ASTOp.DoWhileStatement, null, null, false, AST.DataManifest.NoData);
 
                 for(int i = 0; i < node.nodes.Count - 1; ++i)
                     astDoWhile.branches.Add(ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[i]));
@@ -832,22 +832,22 @@ namespace PxPre.SynthSyn
                 if(node.nodes.Count != 2)
                     throw new SynthExceptionImpossible("Equal needs exactly two trees to evaluate.");
 
-                TokenAST left = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
+                AST left = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
                 if(left.hasAddress == false)
                     throw new SynthExceptionSyntax(node.nodes[0].root, "Left side of equation not addressable.");
 
-                TokenAST right = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[1]);
+                AST right = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[1]);
                 EnsureIntrinsicCompatibility(ref left, ref right, false);
 
-                TokenAST astEq = 
-                    new TokenAST(
+                AST astEq = 
+                    new AST(
                         node.root, 
                         this, 
-                        TokenASTType.SetValue, 
+                        ASTOp.SetValue, 
                         null, 
                         left.evaluatingType, 
                         false, 
-                        TokenAST.DataManifest.NoData, 
+                        AST.DataManifest.NoData, 
                         left, 
                         right);
 
@@ -866,10 +866,10 @@ namespace PxPre.SynthSyn
 
                     int paramNum = node.nodes[0].nodes.Count;
 
-                    List<TokenAST> astParams = new List<TokenAST>();
+                    List<AST> astParams = new List<AST>();
                     foreach(TokenTree tt in node.nodes[0].nodes)
                     {
-                        TokenAST astParamVal = this.ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, tt);
+                        AST astParamVal = this.ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, tt);
                         astParams.Add(astParamVal);
                     }
 
@@ -877,7 +877,7 @@ namespace PxPre.SynthSyn
                     // The top IF branch gets a direct function, whichch the lower ELSE can also do but
                     // we need it because of constructors - since they have a distinct signature BUT
                     // also clash with typenames.
-                    TokenAST caller = null;
+                    AST caller = null;
                     if (node.nodes[1].root.Matches(TokenType.tyWord) && node.nodes[1].nodes.Count == 0)
                     {
                         string fragName = node.nodes[1].root.fragment;
@@ -886,7 +886,7 @@ namespace PxPre.SynthSyn
                         // under a different context.
                         SynthCanidateFunctions canFns = function.GetCanidateFunctions(fragName);
                         if (canFns == null || canFns.functions.Count > 0)
-                            caller = new TokenAST(node.root, this, TokenASTType.GetFunction, canFns, null, false, TokenAST.DataManifest.NoData);
+                            caller = new AST(node.root, this, ASTOp.GetFunction, canFns, null, false, AST.DataManifest.NoData);
                         else
                         { 
                             // If it's a type, get a function from the type with the typenames -
@@ -896,7 +896,7 @@ namespace PxPre.SynthSyn
                             { 
                                 SynthCanidateFunctions consFns = styFrag.GetCanidateFunctions(fragName);
                                 if(consFns == null || consFns.functions.Count > 0)
-                                    caller = new TokenAST(node.root, this, TokenASTType.Construct, consFns, styFrag, false, TokenAST.DataManifest.NoData);
+                                    caller = new AST(node.root, this, ASTOp.Construct, consFns, styFrag, false, AST.DataManifest.NoData);
                             }
                         }
                     }
@@ -930,7 +930,7 @@ namespace PxPre.SynthSyn
                     int startParamIdx = reslvFn.isStatic ? 0 : 1;
                     for (int i = startParamIdx, j = 0; i < reslvFn.parameterSet.Count; ++i, ++j)
                     { 
-                        TokenAST paramAST = astParams[j];
+                        AST paramAST = astParams[j];
                         if(paramAST.evaluatingType == null)
                             throw new SynthExceptionSyntax(paramAST.token, $"Parameter {i} does not evaluate to any type.");
                         else if (paramAST.evaluatingType.intrinsic == reslvFn.parameterSet.Get(i).type.intrinsic)
@@ -952,23 +952,23 @@ namespace PxPre.SynthSyn
                     caller.synthObj = reslvFn;
 
                     if(reslvFn.isStatic == true)
-                        caller.astType = TokenASTType.CallGlobalFn; 
+                        caller.astType = ASTOp.CallGlobalFn; 
                     else if(reslvFn.isConstructor == true)
-                        caller.astType = TokenASTType.Construct;
+                        caller.astType = ASTOp.Construct;
                     else
                     { 
                         // If it's not calling a global function or constructor,
                         // then it's calling a member function. We'll validate the
                         // local struct context later when we build the WASM.
-                        caller.astType = TokenASTType.CallMember;
+                        caller.astType = ASTOp.CallMember;
                     }
 
                     caller.evaluatingType = reslvFn.returnType;
 
                     if(caller.evaluatingType == null)
-                        caller.manifest = TokenAST.DataManifest.NoData;
+                        caller.manifest = AST.DataManifest.NoData;
                     else
-                        caller.manifest = TokenAST.DataManifest.Procedural;
+                        caller.manifest = AST.DataManifest.Procedural;
 
                     return caller;
                 }
@@ -979,45 +979,45 @@ namespace PxPre.SynthSyn
                 if (node.root.Matches(TokenType.tySymbol, "[") == false)
                     throw new SynthExceptionImpossible(""); // TODO:
 
-                TokenAST astKey = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
-                TokenAST astSrc = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[1]);
+                AST astKey = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
+                AST astSrc = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[1]);
                 EnsureTypeIsBitCompatible(astSrc.evaluatingType, node.nodes[1].root);
 
-                return new TokenAST(node.root, this, TokenASTType.Index, null, null, true, TokenAST.DataManifest.Procedural, astSrc, astKey);
+                return new AST(node.root, this, ASTOp.Index, null, null, true, AST.DataManifest.Procedural, astSrc, astKey);
             }
 
             if (node.root.MatchesSymbol("+") == true)
             {
-                TokenAST left, right;
+                AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
 
-                return new TokenAST(node.root, this, TokenASTType.Add, null, left.evaluatingType, false, TokenAST.CombineManifests(left, right), left, right);
+                return new AST(node.root, this, ASTOp.Add, null, left.evaluatingType, false, AST.CombineManifests(left, right), left, right);
             }
 
             if (node.root.MatchesSymbol("-") == true)
             {
                 if(node.nodes.Count == 1)
                 {
-                    TokenAST astExpr = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
+                    AST astExpr = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
 
                     switch(astExpr.astType)
                     {
-                        case TokenASTType.DeclFloat:
+                        case ASTOp.DeclFloat:
                             {
                                 float f = float.Parse(astExpr.token.fragment);
                                 astExpr.token.fragment = (-f).ToString();
                                 return astExpr;
                             }
 
-                        case TokenASTType.DeclFloat64:
+                        case ASTOp.DeclFloat64:
                             {
                                 double d = double.Parse(astExpr.token.fragment);
                                 astExpr.token.fragment = (-d).ToString();
                                 return astExpr;
                             }
 
-                        case TokenASTType.DeclSInt:
-                        case TokenASTType.DeclSInt64:
+                        case ASTOp.DeclSInt:
+                        case ASTOp.DeclSInt64:
                             { 
                                 long l = long.Parse(astExpr.token.fragment);
                                 astExpr.token.fragment = (-l).ToString();
@@ -1025,10 +1025,10 @@ namespace PxPre.SynthSyn
                             }
                     }
 
-                    return new TokenAST(
+                    return new AST(
                         node.root, 
                         this, 
-                        TokenASTType.Negate, 
+                        ASTOp.Negate, 
                         null, 
                         astExpr.evaluatingType, 
                         false, 
@@ -1037,81 +1037,81 @@ namespace PxPre.SynthSyn
                 }
                 else
                 {
-                    TokenAST left, right;
+                    AST left, right;
                     EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
-                    return new TokenAST(node.root, this, TokenASTType.Sub, null, left.evaluatingType, false, TokenAST.CombineManifests(left, right), left, right);
+                    return new AST(node.root, this, ASTOp.Sub, null, left.evaluatingType, false, AST.CombineManifests(left, right), left, right);
                 }
             }
 
             if (node.root.MatchesSymbol("*") == true)
             {
-                TokenAST left, right;
+                AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
-                return new TokenAST(node.root, this, TokenASTType.Mul, null, left.evaluatingType, false, TokenAST.CombineManifests(left, right), left, right);
+                return new AST(node.root, this, ASTOp.Mul, null, left.evaluatingType, false, AST.CombineManifests(left, right), left, right);
             }
 
             if (node.root.MatchesSymbol("/") == true)
             {
-                TokenAST left, right;
+                AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
-                return new TokenAST(node.root, this, TokenASTType.Div, null, left.evaluatingType, false, TokenAST.CombineManifests(left, right), left, right);
+                return new AST(node.root, this, ASTOp.Div, null, left.evaluatingType, false, AST.CombineManifests(left, right), left, right);
             }
 
             if (node.root.MatchesSymbol("%") == true)
             {
-                TokenAST left, right;
+                AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
-                return new TokenAST(node.root, this, TokenASTType.Mod, null, left.evaluatingType, false, TokenAST.CombineManifests(left, right), left, right);
+                return new AST(node.root, this, ASTOp.Mod, null, left.evaluatingType, false, AST.CombineManifests(left, right), left, right);
             }
 
             if (node.root.MatchesSymbol("&") == true)
             {
-                TokenAST left, right;
+                AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new TokenAST(node.root, this, TokenASTType.BitAnd, null, left.evaluatingType, false, TokenAST.CombineManifests(left, right), left, right);
+                return new AST(node.root, this, ASTOp.BitAnd, null, left.evaluatingType, false, AST.CombineManifests(left, right), left, right);
             }
 
             if (node.root.MatchesSymbol("|") == true)
             {
-                TokenAST left, right;
+                AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new TokenAST(node.root, this, TokenASTType.BitOr, null, left.evaluatingType, false, TokenAST.CombineManifests(left, right), left, right);
+                return new AST(node.root, this, ASTOp.BitOr, null, left.evaluatingType, false, AST.CombineManifests(left, right), left, right);
             }
 
             if (node.root.MatchesSymbol("^") == true)
             {
-                TokenAST left, right;
+                AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new TokenAST(node.root, this, TokenASTType.BitXor, null, left.evaluatingType, false, TokenAST.CombineManifests(left, right), left, right);
+                return new AST(node.root, this, ASTOp.BitXor, null, left.evaluatingType, false, AST.CombineManifests(left, right), left, right);
             }
 
             if( node.root.MatchesSymbol(">>") == true)
             {
-                TokenAST left, right;
+                AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new TokenAST(node.root, this, TokenASTType.BitShiftR, null, left.evaluatingType, false, TokenAST.CombineManifests(left, right), left, right);
+                return new AST(node.root, this, ASTOp.BitShiftR, null, left.evaluatingType, false, AST.CombineManifests(left, right), left, right);
             }
 
             if(node.root.MatchesSymbol("<<") == true)
             {
-                TokenAST left, right;
+                AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new TokenAST(node.root, this, TokenASTType.BitShiftL, null, left.evaluatingType, false, TokenAST.CombineManifests(left, right), left, right);
+                return new AST(node.root, this, ASTOp.BitShiftL, null, left.evaluatingType, false, AST.CombineManifests(left, right), left, right);
             }
 
             if (node.root.MatchesSymbol("~") == true)
@@ -1119,80 +1119,80 @@ namespace PxPre.SynthSyn
                 if(node.nodes.Count != 1)
                     throw new SynthExceptionSyntax(node.root, "~ operation expecting exactly 1 tree."); //Not a great error message
 
-                TokenAST evVal = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
+                AST evVal = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
                 EnsureTypeIsBitCompatible(evVal.evaluatingType, node.nodes[0].root);
 
-                TokenAST.DataManifest dm = evVal.manifest;
-                if(dm != TokenAST.DataManifest.ValueConst)
-                    dm = TokenAST.DataManifest.Procedural;
+                AST.DataManifest dm = evVal.manifest;
+                if(dm != AST.DataManifest.ValueConst)
+                    dm = AST.DataManifest.Procedural;
 
-                return new TokenAST(node.root, this, TokenASTType.BitInv, null, evVal.evaluatingType, false, dm, evVal);
+                return new AST(node.root, this, ASTOp.BitInv, null, evVal.evaluatingType, false, dm, evVal);
             }
 
             if (node.root.MatchesSymbol("+=") == true)
             {
-                TokenAST left, right;
+                AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
-                return new TokenAST(node.root, this, TokenASTType.SetAfterAdd, null, null, false, TokenAST.DataManifest.NoData, left, right);
+                return new AST(node.root, this, ASTOp.SetAfterAdd, null, null, false, AST.DataManifest.NoData, left, right);
             }
 
             if (node.root.MatchesSymbol("-=") == true)
             {
-                TokenAST left, right;
+                AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
-                return new TokenAST(node.root, this, TokenASTType.SetAfterSub, null, null, false, TokenAST.DataManifest.NoData, left, right);
+                return new AST(node.root, this, ASTOp.SetAfterSub, null, null, false, AST.DataManifest.NoData, left, right);
             }
 
             if (node.root.MatchesSymbol("*=") == true)
             {
-                TokenAST left, right;
+                AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
-                return new TokenAST(node.root, this, TokenASTType.SetAfterMul, null, null, false, TokenAST.DataManifest.NoData, left, right);
+                return new AST(node.root, this, ASTOp.SetAfterMul, null, null, false, AST.DataManifest.NoData, left, right);
             }
 
             if (node.root.MatchesSymbol("/=") == true)
             {
-                TokenAST left, right;
+                AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
-                return new TokenAST(node.root, this, TokenASTType.SetAfterDiv, null, null, false, TokenAST.DataManifest.NoData, left, right);
+                return new AST(node.root, this, ASTOp.SetAfterDiv, null, null, false, AST.DataManifest.NoData, left, right);
             }
 
             if (node.root.MatchesSymbol("%=") == true)
             {
-                TokenAST left, right;
+                AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
 
-                return new TokenAST(node.root, this, TokenASTType.SetAfterMod, null, null, false, TokenAST.DataManifest.NoData, left, right);
+                return new AST(node.root, this, ASTOp.SetAfterMod, null, null, false, AST.DataManifest.NoData, left, right);
             }
 
             if (node.root.MatchesSymbol("&=") == true)
             {
-                TokenAST left, right;
+                AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new TokenAST(node.root, this, TokenASTType.SetAfterBitAnd, null, null, false, TokenAST.DataManifest.NoData, left, right);
+                return new AST(node.root, this, ASTOp.SetAfterBitAnd, null, null, false, AST.DataManifest.NoData, left, right);
             }
 
             if (node.root.MatchesSymbol("|=") == true)
             {
-                TokenAST left, right;
+                AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new TokenAST(node.root, this, TokenASTType.SetAfterBitOr, null, null, false, TokenAST.DataManifest.NoData, left, right);
+                return new AST(node.root, this, ASTOp.SetAfterBitOr, null, null, false, AST.DataManifest.NoData, left, right);
             }
 
             if (node.root.MatchesSymbol("^=") == true)
             {
-                TokenAST left, right;
+                AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new TokenAST(node.root, this, TokenASTType.SetAfterBitXor, null, null, false, TokenAST.DataManifest.NoData, left, right);
+                return new AST(node.root, this, ASTOp.SetAfterBitXor, null, null, false, AST.DataManifest.NoData, left, right);
             }
 
             return null;
@@ -1204,8 +1204,8 @@ namespace PxPre.SynthSyn
             SynthScope invokingContext, 
             SynthFuncDecl fnDecl, 
             TokenTree tt, 
-            out TokenAST left, 
-            out TokenAST right, 
+            out AST left, 
+            out AST right, 
             bool allowCastingLeft, 
             bool leftRequireAddr)
         {
@@ -1354,7 +1354,7 @@ namespace PxPre.SynthSyn
         /// <param name="left"></param>
         /// <param name="right"></param>
         /// <param name="canCastLeft"></param>
-        public void EnsureIntrinsicCompatibility(ref TokenAST left, ref TokenAST right, bool canCastLeft)
+        public void EnsureIntrinsicCompatibility(ref AST left, ref AST right, bool canCastLeft)
         {
             // If they're the same, no conversion needed.
             if(left.evaluatingType == right.evaluatingType)
@@ -1374,25 +1374,25 @@ namespace PxPre.SynthSyn
                 // declared as a const in the SynthSyntax script.
                 if (canCastLeft == false)
                 {
-                    TokenAST cast = new TokenAST(right.token, this, TokenASTType.ImplicitCast, stySig, stySig, false, TokenAST.CastManifest(right.manifest), right);
+                    AST cast = new AST(right.token, this, ASTOp.ImplicitCast, stySig, stySig, false, AST.CastManifest(right.manifest), right);
                     right = cast;
                     return;
                 }
                 else
                 {
-                    TokenAST cast = new TokenAST(left.token, this, TokenASTType.ImplicitCast, stySig, stySig, false, TokenAST.CastManifest(left.manifest), left);
+                    AST cast = new AST(left.token, this, ASTOp.ImplicitCast, stySig, stySig, false, AST.CastManifest(left.manifest), left);
                     left = cast;
                 }
             }
 
             if(right.evaluatingType != stySig)
             {
-                TokenAST cast = new TokenAST( right.token, this, TokenASTType.ImplicitCast, stySig, stySig, false, TokenAST.CastManifest(right.manifest), right);
+                AST cast = new AST( right.token, this, ASTOp.ImplicitCast, stySig, stySig, false, AST.CastManifest(right.manifest), right);
                 right = cast;
             }
         }
 
-        public void EnsureIntrinsicCompatibility(SynthType leftTy, ref TokenAST right, bool allowReverseForce)
+        public void EnsureIntrinsicCompatibility(SynthType leftTy, ref AST right, bool allowReverseForce)
         { 
             if(right.evaluatingType == leftTy)
                 return;
@@ -1409,7 +1409,7 @@ namespace PxPre.SynthSyn
 
             if (right.evaluatingType != leftTy)
             {
-                TokenAST cast = new TokenAST(right.token, this, TokenASTType.ImplicitCast, leftTy, leftTy, false, TokenAST.CastManifest(right.manifest), right);
+                AST cast = new AST(right.token, this, ASTOp.ImplicitCast, leftTy, leftTy, false, AST.CastManifest(right.manifest), right);
                 right = cast;
             }
         }
@@ -1453,7 +1453,7 @@ namespace PxPre.SynthSyn
             return ret;
         }
 
-        public static TokenAST GetTypeNot(string typename, TokenAST left, TokenAST right)
+        public static AST GetTypeNot(string typename, AST left, AST right)
         {
             if (left.evaluatingType.typeName == typename)
                 return right;
@@ -1467,10 +1467,10 @@ namespace PxPre.SynthSyn
         { 
         }
 
-        public void BuildBSFunction( SynthFuncDecl fnd, TokenAST ast, WASMBuild wasmBuild, SynthContextBuilder ctxBuilder, WASMByteBuilder fnBuild)
+        public void BuildBSFunction( SynthFuncDecl fnd, AST ast, WASMBuild wasmBuild, SynthContextBuilder ctxBuilder, WASMByteBuilder fnBuild)
         { 
 
-            foreach(TokenAST n in ast.branches)
+            foreach(AST n in ast.branches)
             { 
                 this.BuildBSFunctionExpression(fnd, n, wasmBuild, ctxBuilder, fnBuild);
             }
@@ -1478,11 +1478,11 @@ namespace PxPre.SynthSyn
 
         static HashSet<string> match32 = new HashSet<string> { "int8", "uint8", "int16", "uint16", "int", "uint" };
         static HashSet<string> match64 = new HashSet<string> { "int64", "uint64" };
-        public ValueRef BuildBSFunctionExpression(SynthFuncDecl fnd, TokenAST expr, WASMBuild wasmBuild, SynthContextBuilder ctxBuilder, WASMByteBuilder fnBuild)
+        public ValueRef BuildBSFunctionExpression(SynthFuncDecl fnd, AST expr, WASMBuild wasmBuild, SynthContextBuilder ctxBuilder, WASMByteBuilder fnBuild)
         { 
             switch(expr.astType)
             {
-                case TokenASTType.SetValue:
+                case ASTOp.SetValue:
                     { 
                         if(expr.branches.Count != 2)
                             throw new SynthExceptionCompile("Setting a value expected two parameters, a target and a destination.");
@@ -1548,10 +1548,10 @@ namespace PxPre.SynthSyn
                             throw new SynthExceptionCompile($"Setting non-local variables at {vrLeft.valLoc} currently not supported.");
                     }
 
-                case TokenASTType.GetGlobalVar:
+                case ASTOp.GetGlobalVar:
                     break;
 
-                case TokenASTType.GetMemberVar:
+                case ASTOp.GetMemberVar:
                     { 
                         if(expr.branches.Count != 2)
                             throw new SynthExceptionImpossible("Getting member with an unexpected number of branches.");
@@ -1580,7 +1580,7 @@ namespace PxPre.SynthSyn
                         throw new SynthExceptionSyntax(expr.token, "Member is not dereferenceable.");
                     }
 
-                case TokenASTType.GetLocalVar:
+                case ASTOp.GetLocalVar:
                     { 
                         ValueRef vr = this.GetLocalVariable(expr.token.fragment);
 
@@ -1600,7 +1600,7 @@ namespace PxPre.SynthSyn
                         return vr;
                     }
 
-                case TokenASTType.GetParamVar:
+                case ASTOp.GetParamVar:
                     { 
                         SynthVarValue svvParam = fnd.GetParameter(expr.token.fragment);
                         if(svvParam == null)
@@ -1617,13 +1617,13 @@ namespace PxPre.SynthSyn
                         return new ValueRef(ValueLoc.ValueOnStack, -1, -1, vr.varType);
                     }
 
-                case TokenASTType.GetFunction:
+                case ASTOp.GetFunction:
                     break;
 
-                case TokenASTType.GetRegion:
+                case ASTOp.GetRegion:
                     break;
 
-                case TokenASTType.GetThis:
+                case ASTOp.GetThis:
                     {
                         SynthType styThis = fnd.GetStructScope();
                         if(styThis == null)
@@ -1640,58 +1640,58 @@ namespace PxPre.SynthSyn
                         return new ValueRef(ValueLoc.PointerOnStack, -1, -1, styThis, 1);
                     }
 
-                case TokenASTType.FunctionDecl:
+                case ASTOp.FunctionDecl:
                     break;
 
-                case TokenASTType.SetAfterAdd:
+                case ASTOp.SetAfterAdd:
                     break;
 
-                case TokenASTType.SetAfterSub:
+                case ASTOp.SetAfterSub:
                     break;
 
-                case TokenASTType.SetAfterMul:
+                case ASTOp.SetAfterMul:
                     break;
 
-                case TokenASTType.SetAfterDiv:
+                case ASTOp.SetAfterDiv:
                     break;
 
-                case TokenASTType.SetAfterMod:
+                case ASTOp.SetAfterMod:
                     break;
 
-                case TokenASTType.SetAfterBitOr:
+                case ASTOp.SetAfterBitOr:
                     break;
 
-                case TokenASTType.SetAfterBitAnd:
+                case ASTOp.SetAfterBitAnd:
                     break;
 
-                case TokenASTType.SetAfterBitXor:
+                case ASTOp.SetAfterBitXor:
                     break;
 
-                case TokenASTType.SetAfterShiftL:
+                case ASTOp.SetAfterShiftL:
                     break;
 
-                case TokenASTType.SetAfterShiftR:
+                case ASTOp.SetAfterShiftR:
                     break;
 
-                case TokenASTType.Index:
+                case ASTOp.Index:
                     break;
 
-                case TokenASTType.IfStatement:
+                case ASTOp.IfStatement:
                     break;
 
-                case TokenASTType.WhileStatement:
+                case ASTOp.WhileStatement:
                     break;
 
-                case TokenASTType.ForStatement:
+                case ASTOp.ForStatement:
                     break;
 
-                case TokenASTType.DoWhileStatement:
+                case ASTOp.DoWhileStatement:
                     break;
 
-                case TokenASTType.Add:
+                case ASTOp.Add:
                     {
-                        TokenAST left = expr.branches[0];
-                        TokenAST right = expr.branches[1];
+                        AST left = expr.branches[0];
+                        AST right = expr.branches[1];
 
                         // TODO: If these are addresses, get the address
                         ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
@@ -1733,10 +1733,10 @@ namespace PxPre.SynthSyn
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, left.evaluatingType);
                     }
 
-                case TokenASTType.Sub:
+                case ASTOp.Sub:
                     {
-                        TokenAST left = expr.branches[0];
-                        TokenAST right = expr.branches[1];
+                        AST left = expr.branches[0];
+                        AST right = expr.branches[1];
 
                         ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
                         vrLeft.PutInstrinsicValueOnStack(fnBuild);
@@ -1777,10 +1777,10 @@ namespace PxPre.SynthSyn
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, left.evaluatingType);
                     }
 
-                case TokenASTType.Mul:
+                case ASTOp.Mul:
                     {
-                        TokenAST left = expr.branches[0];
-                        TokenAST right = expr.branches[1];
+                        AST left = expr.branches[0];
+                        AST right = expr.branches[1];
 
                         ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
                         vrLeft.PutInstrinsicValueOnStack(fnBuild);
@@ -1821,10 +1821,10 @@ namespace PxPre.SynthSyn
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, left.evaluatingType);
                     }
 
-                case TokenASTType.Div:
+                case ASTOp.Div:
                     {
-                        TokenAST left = expr.branches[0];
-                        TokenAST right = expr.branches[1];
+                        AST left = expr.branches[0];
+                        AST right = expr.branches[1];
 
                         ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
                         vrLeft.PutInstrinsicValueOnStack(fnBuild);
@@ -1871,10 +1871,10 @@ namespace PxPre.SynthSyn
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, left.evaluatingType);
                     }
 
-                case TokenASTType.Mod:
+                case ASTOp.Mod:
                     {
-                        TokenAST left = expr.branches[0];
-                        TokenAST right = expr.branches[1];
+                        AST left = expr.branches[0];
+                        AST right = expr.branches[1];
 
                         ValueRef vrLeft = BuildBSFunctionExpression(fnd, left, wasmBuild, ctxBuilder, fnBuild);
                         vrLeft.PutInstrinsicValueOnStack(fnBuild);
@@ -1923,29 +1923,29 @@ namespace PxPre.SynthSyn
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, left.evaluatingType);
                     }
 
-                case TokenASTType.BitOr:
-                case TokenASTType.BitAnd:
-                case TokenASTType.BitXor:
+                case ASTOp.BitOr:
+                case ASTOp.BitAnd:
+                case ASTOp.BitXor:
                     {
-                        TokenAST left = expr.branches[0];
-                        TokenAST right = expr.branches[1];
+                        AST left = expr.branches[0];
+                        AST right = expr.branches[1];
 
                         WASM.Instruction instr32;
                         WASM.Instruction instr64;
                         switch(expr.astType)
                         { 
-                            case TokenASTType.BitOr:
+                            case ASTOp.BitOr:
                                 instr32 = WASM.Instruction.i32_or;
                                 instr64 = WASM.Instruction.i64_or;
                                 break;
 
                             default:
-                            case TokenASTType.BitAnd:
+                            case ASTOp.BitAnd:
                                 instr32 = WASM.Instruction.i32_and;
                                 instr64 = WASM.Instruction.i64_and;
                                 break;
 
-                            case TokenASTType.BitXor:
+                            case ASTOp.BitXor:
                                 instr32 = WASM.Instruction.i32_xor;
                                 instr64 = WASM.Instruction.i64_xor;
                                 break;
@@ -1989,12 +1989,12 @@ namespace PxPre.SynthSyn
                         }
                     }
 
-                case TokenASTType.BitInv:
+                case ASTOp.BitInv:
                     {
                         if(expr.branches.Count != 1)
                             throw new SynthExceptionImpossible("Bit inv has an unexpected node count.");
 
-                        TokenAST astVal = expr.branches[0];
+                        AST astVal = expr.branches[0];
 
                         // https://github.com/WebAssembly/design/issues/701
                         if (match32.Contains(astVal.evaluatingType.typeName) == true)
@@ -2023,10 +2023,10 @@ namespace PxPre.SynthSyn
                         return new ValueRef(ValueLoc.ValueOnStack, -1, -1, astVal.evaluatingType);
                     }
 
-                case TokenASTType.BitShiftL:
+                case ASTOp.BitShiftL:
                     {
-                        TokenAST left = expr.branches[0];
-                        TokenAST right = expr.branches[1];
+                        AST left = expr.branches[0];
+                        AST right = expr.branches[1];
 
                         // It's uncertain how the autocasting should work
                         if (
@@ -2063,10 +2063,10 @@ namespace PxPre.SynthSyn
                         }
                     }
 
-                case TokenASTType.BitShiftR:
+                case ASTOp.BitShiftR:
                     {
-                        TokenAST left = expr.branches[0];
-                        TokenAST right = expr.branches[1];
+                        AST left = expr.branches[0];
+                        AST right = expr.branches[1];
 
                         HashSet<string> match32 = new HashSet<string> { "int8", "uint8", "int16", "uint16", "int", "uint" };
                         HashSet<string> match64 = new HashSet<string> { "int64", "uint64" };
@@ -2125,10 +2125,10 @@ namespace PxPre.SynthSyn
                         }
                     }
 
-                case TokenASTType.Unprocessed: 
+                case ASTOp.Unprocessed: 
                     break;
 
-                case TokenASTType.RegisterLocalVar:
+                case ASTOp.RegisterLocalVar:
                     // The language doesn't return any kind of value for registering a local.
                     {
                         ValueRef vrReg = this.GetLocalVariable(expr.branches[0].token.fragment);
@@ -2137,7 +2137,7 @@ namespace PxPre.SynthSyn
                         // an initialization
                         if (expr.branches.Count > 1) 
                         {
-                            if(expr.branches[1].astType == TokenASTType.Construct)
+                            if(expr.branches[1].astType == ASTOp.Construct)
                             {
                                 if(vrReg.varType.intrinsic == true)
                                     throw new SynthExceptionSyntax(expr.branches[1].token, "Cannot construct intrinsic type.");
@@ -2173,7 +2173,7 @@ namespace PxPre.SynthSyn
                         return new ValueRef(ValueLoc.NoValue, 0, 0, vrReg.varType);
                     }
 
-                case TokenASTType.DeclBool:
+                case ASTOp.DeclBool:
                     {
                         if(expr.token.fragment == "false" || expr.token.fragment == "0")
                             fnBuild.Add_I32Const(0);
@@ -2184,7 +2184,7 @@ namespace PxPre.SynthSyn
                         return new ValueRef( ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
-                case TokenASTType.DeclUInt:
+                case ASTOp.DeclUInt:
                     {
                         // i32.const values are uninterpreted ints, which are
                         // signed
@@ -2195,7 +2195,7 @@ namespace PxPre.SynthSyn
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
-                case TokenASTType.DeclSInt:
+                case ASTOp.DeclSInt:
                     { 
                         int val = int.Parse(expr.token.fragment);
                         fnBuild.Add_I32Const(val);
@@ -2204,7 +2204,7 @@ namespace PxPre.SynthSyn
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
-                case TokenASTType.DeclUInt64:
+                case ASTOp.DeclUInt64:
                     { 
                         ulong val = ulong.Parse(expr.token.fragment);
                         fnBuild.Add_I64Const(val);
@@ -2213,7 +2213,7 @@ namespace PxPre.SynthSyn
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
-                case TokenASTType.DeclSInt64:
+                case ASTOp.DeclSInt64:
                     { 
                         long val = long.Parse(expr.token.fragment);
                         fnBuild.Add_I64Const(val);
@@ -2222,7 +2222,7 @@ namespace PxPre.SynthSyn
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
-                case TokenASTType.DeclFloat:
+                case ASTOp.DeclFloat:
                     { 
                         float val = float.Parse(expr.token.fragment);
                         fnBuild.Add_F32Const(val);
@@ -2231,7 +2231,7 @@ namespace PxPre.SynthSyn
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
-                case TokenASTType.DeclFloat64:
+                case ASTOp.DeclFloat64:
                     {
                         double val = double.Parse(expr.token.fragment);
                         fnBuild.Add_F64Const(val);
@@ -2240,13 +2240,13 @@ namespace PxPre.SynthSyn
                         return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
                     }
 
-                case TokenASTType.DeclString:
+                case ASTOp.DeclString:
                     { 
                         // TODO:
                     }
                     break;
 
-                case TokenASTType.ExplicitCast:
+                case ASTOp.ExplicitCast:
                     {
                         if (expr.branches.Count != 1)
                             throw new SynthExceptionImpossible("Attempting to cast with unexpected number of branches.");
@@ -2260,7 +2260,7 @@ namespace PxPre.SynthSyn
                         return new ValueRef(ValueLoc.ValueOnStack, -1, -1, styCastTo);
                     }
 
-                case TokenASTType.ImplicitCast:
+                case ASTOp.ImplicitCast:
                     {
                         if (expr.branches.Count != 1)
                             throw new SynthExceptionImpossible("Attempting to cast with unexpected number of branches.");
@@ -2277,25 +2277,25 @@ namespace PxPre.SynthSyn
                         return new ValueRef(ValueLoc.ValueOnStack, -1, -1, styCastTo);
                     }
 
-                case TokenASTType.Compare_Eq:
+                case ASTOp.Compare_Eq:
                     break;
 
-                case TokenASTType.Compare_NEq:
+                case ASTOp.Compare_NEq:
                     break;
 
-                case TokenASTType.Compare_LessThan:
+                case ASTOp.Compare_LessThan:
                     break;
 
-                case TokenASTType.Compare_LessThanEq:
+                case ASTOp.Compare_LessThanEq:
                     break;
 
-                case TokenASTType.Compare_GreaterThan:
+                case ASTOp.Compare_GreaterThan:
                     break;
 
-                case TokenASTType.Compare_GreaterThanEq:
+                case ASTOp.Compare_GreaterThanEq:
                     break;
 
-                case TokenASTType.CallMember:
+                case ASTOp.CallMember:
                     { 
                         SynthFuncDecl fnInvoke = expr.synthObj.CastFuncDecl();
                         if(fnInvoke == null)
@@ -2312,7 +2312,7 @@ namespace PxPre.SynthSyn
                         return BuildBSFunctionInvoke(fnInvoke, fnd, expr, wasmBuild, ctxBuilder, fnBuild);
                     }
 
-                case TokenASTType.CallGlobalFn:
+                case ASTOp.CallGlobalFn:
                     { 
                         if(expr.synthObj == null)
                             throw new SynthExceptionImpossible("Missing function for global AST processing.");
@@ -2327,7 +2327,7 @@ namespace PxPre.SynthSyn
                         return BuildBSFunctionInvoke(fnInvoke, fnd, expr, wasmBuild, ctxBuilder, fnBuild);
                     }
 
-                case TokenASTType.Negate:
+                case ASTOp.Negate:
                     { 
                         if(expr.branches.Count != 1)
                             throw new SynthExceptionImpossible("Negate encountered with unexpected AST branches.");
@@ -2368,13 +2368,13 @@ namespace PxPre.SynthSyn
                         }
                     }
 
-                case TokenASTType.DefaultParam:
+                case ASTOp.DefaultParam:
                     break;
 
-                case TokenASTType.Destruct:
+                case ASTOp.Destruct:
                     break;
 
-                case TokenASTType.EndScope:
+                case ASTOp.EndScope:
                     { 
                         SynthContextBuilder ctxNest = expr.synthObj.CastNest();
                         if(ctxNest == null)
@@ -2396,7 +2396,7 @@ namespace PxPre.SynthSyn
                         return new ValueRef(ValueLoc.NoValue, -1, -1, null);
                     }
 
-                case TokenASTType.ReturnValue:
+                case ASTOp.ReturnValue:
                     {
                         if(expr.branches.Count != 1)
                             throw new SynthExceptionImpossible("Return value missing the value node.");
@@ -2633,7 +2633,7 @@ namespace PxPre.SynthSyn
         public ValueRef BuildBSFunctionInvoke(
             SynthFuncDecl fnInvoke, 
             SynthFuncDecl fnd, 
-            TokenAST expr, 
+            AST expr, 
             WASMBuild wasmBuild, 
             SynthContextBuilder ctxBuilder, 
             WASMByteBuilder fnBuild)
