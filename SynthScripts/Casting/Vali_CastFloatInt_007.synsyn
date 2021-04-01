@@ -1,12 +1,14 @@
-//
-// >> Name: "Cast Float->Int 003"
-// >> Results: {11, 20, 167, 142}
+// Test the conversion of float -> int in situations that
+// involve casting struct members and methods.
+// 
+// >> Name: "Cast Float->Int 007"
+// >> Results: {56, 45, 5}
 //
 
 extern void LogTest(int loggedVal);
 extern void EndTest();
 
-struct TestStruct()
+struct TestStruct
 {
 	float x;
 	float y;
@@ -19,11 +21,20 @@ struct TestStruct()
 	
 	int GetIntSquare1()
 	{
+		// test returning a casted value,
+		// with the conversion float -> int.
+		
 		return (int)(x * y);
 	}
 	
 	int GetIntSquare2()
 	{
+		// Test a different variant of casted values,
+		// with the conversion float -> int.
+		//
+		// This also is additional expression and order or operation
+		// testing with casts.
+		
 		return (int)x * (int)y;
 	}
 }
@@ -34,6 +45,9 @@ entry DoTest()
 	
 	LogTest(ts.GetIntSquare1());
 	LogTest(ts.GetIntSquare2());
+	
+	// Test accessing the member and casting without getting
+	// the value as a return value.
 	LogTest((int)ts.x);
 
 	EndTest();
