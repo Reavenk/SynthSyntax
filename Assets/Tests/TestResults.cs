@@ -29,7 +29,7 @@ public class TestResults
     public void TestExpectations(params float [] exp)
     { 
         if(this.fResults.Count != exp.Length)
-            throw new System.Exception($"Float results count expected {exp.Length} but instead of {this.fResults.Count}.");
+            throw new System.Exception($"Float results count expected {exp.Length} but instead got {this.fResults.Count}.");
 
         for(int i = 0; i < exp.Length; ++i)
         {
