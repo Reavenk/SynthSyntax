@@ -25,6 +25,13 @@ namespace PxPre.SynthSyn
             Memory
         }
 
+        public enum SignMode
+        { 
+            Signed,
+            Unsigned,
+            Agnostic
+        }
+
         /// <summary>
         /// The number of bytes pushed on the stack. Does not include local variables.
         /// </summary>
@@ -40,6 +47,7 @@ namespace PxPre.SynthSyn
         public int totalMemoryStackBytes = 0;
         public List<ValueRef> memStkEle = new List<ValueRef>();
         public Dictionary<string, ValueRef> memStkVars = new Dictionary<string, ValueRef>();
+
 
         List<ValueRef> allLocalVars = new List<ValueRef>();
 
@@ -223,6 +231,8 @@ namespace PxPre.SynthSyn
 
         TokenAST ProcessMathTree(SynthScope scope, TokenTree tt)
         {
+            // TODO: Is this a duplicate of ProcessMathOperators()?
+
             foreach (OperatorInfo oi in OperatorsCmp)
             {
                 if (tt.root.MatchesSymbol(oi.tokStr) == true)
@@ -234,7 +244,7 @@ namespace PxPre.SynthSyn
                         left.evaluatingType.intrinsic == true &&
                         right.evaluatingType.intrinsic == true)
                     {
-                        EnsureIntrinsicCompatibility(left, ref right);
+                        EnsureIntrinsicCompatibility(ref left, ref right, true);
 
                         return new TokenAST(
                             tt.root, 
@@ -270,7 +280,7 @@ namespace PxPre.SynthSyn
                         left.evaluatingType.intrinsic == true &&
                         right.evaluatingType.intrinsic == true)
                     {
-                        EnsureIntrinsicCompatibility(left, ref right);
+                        EnsureIntrinsicCompatibility(ref left, ref right, true);
 
                         return new TokenAST(
                             tt.root, 
@@ -306,7 +316,8 @@ namespace PxPre.SynthSyn
                         left.evaluatingType.intrinsic == true &&
                         right.evaluatingType.intrinsic == true)
                     {
-                        EnsureIntrinsicCompatibility(left, ref right);
+                        EnsureIntrinsicCompatibility(ref left, ref right, true);
+
                         return new TokenAST(
                             tt.root, 
                             this, 
@@ -339,7 +350,7 @@ namespace PxPre.SynthSyn
                         left.evaluatingType.intrinsic == true &&
                         right.evaluatingType.intrinsic == true)
                     {
-                        EnsureIntrinsicCompatibility(left, ref right);
+                        EnsureIntrinsicCompatibility(ref left, ref right, true);
 
                         return new TokenAST(
                             tt.root, 
@@ -479,6 +490,11 @@ namespace PxPre.SynthSyn
             SynthFuncDecl function, 
             TokenTree node)
         {
+            // We may formalize this later instead of piggybacking off the fact
+            // that the function has fallback access to the base scope where
+            // instrinsics are defined.
+            SynthScope intrinsicSource = function;
+
             if(node.root.Matches(TokenType.tyBool) == true)
             {
                 EnsureNoTreeChildNodes(node);
@@ -578,6 +594,44 @@ namespace PxPre.SynthSyn
 
             if(node.root.Matches(TokenType.tyWord) == true)
             { 
+                if(node.keyword == "cast")
+                { 
+                    // TODO: Later on for more complex types, we may need to 
+                    // use class casting constructors.
+
+                    if(node.nodes.Count != 1)
+                        throw new SynthExceptionImpossible("Invalid AST branches for casting.");
+
+                    string typeCast = node.root.fragment;
+                    SynthType styCast = intrinsicSource.GetType(typeCast);
+
+                    if(styCast == null)
+                        throw new SynthExceptionSyntax(node.root, "Could not find existed casted type.");
+
+                    TokenAST astCast = 
+                        ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
+
+                    // Having an AST type for each instrinsic cast seems a little bloated. 
+                    // There may be a more elegant way to do all this.
+                    switch (typeCast)
+                    { 
+                        case "int8":
+                        case "uint8":
+                        case "int16":
+                        case "uint16":
+                        case "int":
+                        case "uint":
+                        case "int64":
+                        case "float":
+                        case "float64":
+                            return new TokenAST(node.root, this, TokenASTType.ExplicitCast, null, styCast, false, TokenAST.CastManifest(astCast.manifest), astCast);
+
+                        case "bool":
+                        default:
+                            throw new SynthExceptionCompile($"Cannot support casting of type {typeCast}.");
+                    }
+                }
+
                 if(node.root.Matches("this") == true)
                 { 
                     if(function.isStatic == true)
@@ -783,7 +837,7 @@ namespace PxPre.SynthSyn
                     throw new SynthExceptionSyntax(node.nodes[0].root, "Left side of equation not addressable.");
 
                 TokenAST right = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[1]);
-                EnsureIntrinsicCompatibility(left.evaluatingType, left.manifest, ref right);
+                EnsureIntrinsicCompatibility(ref left, ref right, false);
 
                 TokenAST astEq = 
                     new TokenAST(
@@ -885,7 +939,7 @@ namespace PxPre.SynthSyn
                             //
                             // NOTE: Not really sure what the manifest should be for the left here (for function
                             // parameters).
-                            EnsureIntrinsicCompatibility(reslvFn.parameterSet.Get(i).type, TokenAST.DataManifest.ValueConst, ref paramAST);
+                            EnsureIntrinsicCompatibility(reslvFn.parameterSet.Get(i).type, ref paramAST, true);
                         }
                         else if(paramAST.evaluatingType != reslvFn.parameterSet.Get(i).type)
                             throw new SynthExceptionSyntax(paramAST.token, $"Type mismatch for parameter {i}: expected type {reslvFn.parameterSet.Get(i).type.typeName} but got {paramAST.evaluatingType.typeName}.");
@@ -962,8 +1016,8 @@ namespace PxPre.SynthSyn
                                 return astExpr;
                             }
 
-                        case TokenASTType.Cast_Int:
-                        case TokenASTType.Cast_Int64:
+                        case TokenASTType.DeclSInt:
+                        case TokenASTType.DeclSInt64:
                             { 
                                 long l = long.Parse(astExpr.token.fragment);
                                 astExpr.token.fragment = (-l).ToString();
@@ -1161,29 +1215,29 @@ namespace PxPre.SynthSyn
             left = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, fnDecl, tt.nodes[0]);
             right = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, fnDecl, tt.nodes[1]);
 
+
             if(left == null || left.evaluatingType == null)
                 throw new SynthExceptionSyntax(tt.root, $"Error parsing {tt.root.fragment}, left side of equation does not evaluate to a type.");
 
             if(right == null || right.evaluatingType == null)
                 throw new SynthExceptionSyntax(tt.root, $"Error parsing {tt.root.fragment}, right side of equation does not evaluate to a type.");
 
-            if (leftRequireAddr == true)
-            {
-                if (left.hasAddress == false)
-                    throw new SynthExceptionSyntax(tt.root, $"Error parsing {tt.root.fragment}, left side expected to be addressable.");
-            }
 
-            try
-            {
-                EnsureIntrinsicCompatibility(left.evaluatingType, left.manifest, ref right, false);
-            }
-            catch(System.Exception ex)
-            {
-                if (leftRequireAddr == false)
-                    throw ex;
+            if (leftRequireAddr == true && left.hasAddress == false)
+                throw new SynthExceptionSyntax(tt.root, $"Error parsing {tt.root.fragment}, left side expected to be addressable.");
 
-                EnsureIntrinsicCompatibility(left.evaluatingType, left.manifest, ref right);
-            }
+            // This doesn't handle intrinsics, although more probably needs to be decided about the language.
+            if(left.evaluatingType == right.evaluatingType)
+                return;
+
+            SynthType castedTy = GetSignificantIntrinsicType(left.evaluatingType, right.evaluatingType, left.token);
+
+            EnsureIntrinsicCompatibility(ref left, ref right, allowCastingLeft);
+
+            // Check again, in case the left side required a cast to make the expression
+            // compatible.
+            if (leftRequireAddr == true && left.hasAddress == false)
+                throw new SynthExceptionSyntax(tt.root, $"Error parsing {tt.root.fragment}, left side expected to be addressable.");
         }
 
         public static void EnsureTypeIsInt(SynthType sty, Token tErrSrc)
@@ -1212,9 +1266,83 @@ namespace PxPre.SynthSyn
             }
         }
 
-        public void EnsureIntrinsicCompatibility(TokenAST left, ref TokenAST right)
-        {
-            EnsureIntrinsicCompatibility(left.evaluatingType, left.manifest, ref right);
+        public static SynthType GetSignificantIntrinsicType(SynthType left, SynthType right, Token tok)
+        { 
+            if(left.intrinsic == false || right.intrinsic == false)
+                throw new SynthExceptionImpossible("Attempting to get significant intrinsic type with a non-intrinsic.");
+
+            if(left == right)
+                return left;
+
+            int leftGrade = _GetIntrinsicSignificanceLevel(left.typeName);
+            int rightGrade = _GetIntrinsicSignificanceLevel(right.typeName);
+
+            if(leftGrade > rightGrade)
+                return left;
+
+            if(rightGrade > leftGrade)
+                return right;
+
+            // TODO: There's actually more we have to do in regards to error checking.
+            // The biggest issue is with implicitly casting a signed int type to an 
+            // unsigned int type, even if it's a larger bit width.
+            // 
+            // TODO: If we're mixing integers of the same bitwidth and different sign,
+            // we can actually keep the expressions compatible if we force an implicit
+            // cast to a signed type of a larger bit width. This falls apart though
+            // when dealing with uin64 vs int64.
+
+            throw new SynthExceptionSyntax(tok, $"Cannot perform implicity cast between {left.typeName} and {right.typeName}. An explicit cast is required.");
+        }
+
+        public static SignMode _GetIntrinsicSignMode(string type)
+        { 
+            switch(type)
+            { 
+                case "bool":
+                case "float":
+                case "float64":
+                    return SignMode.Agnostic;
+
+                case "int8":
+                case "int16":
+                case "int":
+                case "int64":
+                    return SignMode.Signed;
+
+                case "uint8":
+                case "uint16":
+                case "uint":
+                case "uint64":
+                    return SignMode.Unsigned;
+            }
+            throw new SynthExceptionImpossible($"Attempting to get sign mode of unknown intrinsic type {type}.");
+        }
+
+        private static int _GetIntrinsicSignificanceLevel(string type)
+        { 
+            switch(type)
+            { 
+                case "bool":
+                    return 0;
+                case "uint8":
+                case "int8":
+                    return 1;
+                case "uint16":
+                case "int16":
+                    return 2;
+                case "uint":
+                case "int":
+                    return 3;
+                case "uint64":
+                case "int64":
+                    return 4;
+                case "float":
+                    return 5;
+                case "float64":
+                    return 6;
+            }
+            throw new SynthExceptionImpossible($"Attempting to grade significance level of unknown intrinsic type {type}.");
         }
 
         /// <summary>
@@ -1223,147 +1351,67 @@ namespace PxPre.SynthSyn
         /// 
         /// If they are not the same, attempt to cast value to the correct type.
         /// </summary>
-        /// <param name="styLeft">The type the right needs to match.</param>
-        /// <param name="right">The value who's type is being matched, or casted if necessary.</param>
-        public bool EnsureIntrinsicCompatibility(SynthType styLeft, TokenAST.DataManifest leftMan, ref TokenAST right, bool throwOnFail = true)
+        /// <param name="left"></param>
+        /// <param name="right"></param>
+        /// <param name="canCastLeft"></param>
+        public void EnsureIntrinsicCompatibility(ref TokenAST left, ref TokenAST right, bool canCastLeft)
         {
             // If they're the same, no conversion needed.
-            if(styLeft == right.evaluatingType)
-                return true;
+            if(left.evaluatingType == right.evaluatingType)
+                return;
 
             // Impossible throws will throw no matter what.
-            if (styLeft.intrinsic == false || right.evaluatingType.intrinsic == false)
+            if (left.evaluatingType.intrinsic == false || right.evaluatingType.intrinsic == false)
                     throw new SynthExceptionImpossible("Checking instrinsic compatibility of non-intrinsic character.");
 
-            HashSet<string> hs = new HashSet<string>();
-            hs.Add(styLeft.typeName);
-            hs.Add(right.evaluatingType.typeName);
+            SynthType stySig = GetSignificantIntrinsicType(left.evaluatingType, right.evaluatingType, left.token);
 
-            // If we only have 1 entry, they have the same name and should be the same, but 
-            // then how did they fail the first if-statement of the function?
-            //
-            // Impossible
-            if (hs.Count == 1)
-                throw new SynthExceptionImpossible("Compatible types were actually the same.");
-
-            if (CountMatches(hs, "float", "double") == 2)
+            if(left.evaluatingType != stySig)
             {
-                if (styLeft.typeName == "double")
+                // If we can't perform an implicit cast on the left, perform one on the right,
+                // and we'll evaluate if it's a valid cast a little later. Some types of downgrading
+                // casts are allowed, mainly integer downgrades if we're downgrading a value that's
+                // declared as a const in the SynthSyntax script.
+                if (canCastLeft == false)
                 {
-                    TokenAST cast = 
-                        new TokenAST(
-                            right.token, 
-                            this, 
-                            TokenASTType.Cast_Double, 
-                            styLeft, 
-                            styLeft, 
-                            false, 
-                            TokenAST.CombineManifests(leftMan, right.manifest),
-                            right);
-
+                    TokenAST cast = new TokenAST(right.token, this, TokenASTType.ImplicitCast, stySig, stySig, false, TokenAST.CastManifest(right.manifest), right);
                     right = cast;
-                    return true;
+                    return;
                 }
-
-            }
-
-            if (CountMatches(hs, "int", "int8", "int16", "int64", "uint", "uint8", "uint16", "uint16") > 0 && hs.Contains("float"))
-            {
-                if (styLeft.typeName == "float")
+                else
                 {
-                    TokenAST cast = 
-                        new TokenAST(
-                            right.token, 
-                            this, 
-                            TokenASTType.Cast_Float, 
-                            styLeft, 
-                            styLeft, 
-                            false,
-                            TokenAST.CombineManifests(leftMan, right.manifest),
-                            right);
-
-                    right = cast;
-                    return true;
+                    TokenAST cast = new TokenAST(left.token, this, TokenASTType.ImplicitCast, stySig, stySig, false, TokenAST.CastManifest(left.manifest), left);
+                    left = cast;
                 }
             }
 
-            if (CountMatches(hs, "int", "int8", "int16", "int64", "uint", "uint8", "uint16", "uint16") > 0 && hs.Contains("double"))
+            if(right.evaluatingType != stySig)
             {
-                if (styLeft.typeName == "double")
-                {
-                    TokenAST cast = 
-                        new TokenAST(
-                            right.token, 
-                            this, 
-                            TokenASTType.Cast_Double, 
-                            styLeft, 
-                            styLeft, 
-                            false,
-                            TokenAST.CombineManifests(leftMan, right.manifest),
-                            right);
-
-                    right = cast;
-                    return true;
-                }
+                TokenAST cast = new TokenAST( right.token, this, TokenASTType.ImplicitCast, stySig, stySig, false, TokenAST.CastManifest(right.manifest), right);
+                right = cast;
             }
-
-            if (
-                CountMatches(hs, "int8", "int", "int16", "int64") == 2 ||
-                CountMatches(hs, "uint8", "uint", "uint16", "uint64") == 2)
-            {
-                if(
-                    GetIntrinsicByteSizeFromName(styLeft.typeName) > GetIntrinsicByteSizeFromName(right.evaluatingType.typeName) ||
-                    right.manifest == TokenAST.DataManifest.ValueConst )
-                {
-                    TokenAST cast = 
-                        new TokenAST(
-                            right.token, 
-                            this, 
-                            GetCastInstrinsicType(styLeft.typeName), 
-                            styLeft, 
-                            styLeft, 
-                            false,
-                            TokenAST.CombineManifests(leftMan, right.manifest), 
-                            right);
-
-                    right = cast;
-                    return true;
-                }
-            }
-
-            if(throwOnFail == true)
-                throw new SynthExceptionSyntax(right.token, $"Cannot perform operation between {styLeft.typeName} and {right.evaluatingType.typeName} without a cast.");
-
-            return false;
         }
 
-        public static TokenASTType GetCastInstrinsicType(string ty)
-        {
-            switch (ty)
+        public void EnsureIntrinsicCompatibility(SynthType leftTy, ref TokenAST right, bool allowReverseForce)
+        { 
+            if(right.evaluatingType == leftTy)
+                return;
+
+            if (leftTy.intrinsic == false || right.evaluatingType.intrinsic == false)
+                throw new SynthExceptionImpossible("Checking instrinsic compatibility of non-intrinsic character.");
+
+            SynthType stySig = GetSignificantIntrinsicType(leftTy, right.evaluatingType, right.token);
+            if(stySig != leftTy)
             {
-                case "int8":
-                    return TokenASTType.Cast_Int8;
-                case "uint8":
-                    return TokenASTType.Cast_UInt8;
-                case "int16":
-                    return TokenASTType.Cast_Int16;
-                case "uint16":
-                    return TokenASTType.Cast_UInt16;
-                case "int":
-                    return TokenASTType.Cast_Int;
-                case "uint":
-                    return TokenASTType.Cast_UInt;
-                case "float":
-                    return TokenASTType.Cast_Float;
-                case "int64":
-                    return TokenASTType.Cast_Int64;
-                case "uint64":
-                    return TokenASTType.Cast_UInt64;
-                case "double":
-                    return TokenASTType.Cast_Double;
+                if(allowReverseForce == false)
+                    throw new SynthExceptionSyntax(right.token, "Cannot maintain type compatability without explicitly casting the right value.");
             }
 
-            throw new SynthExceptionImpossible("Could not get casting code from type name.");
+            if (right.evaluatingType != leftTy)
+            {
+                TokenAST cast = new TokenAST(right.token, this, TokenASTType.ImplicitCast, leftTy, leftTy, false, TokenAST.CastManifest(right.manifest), right);
+                right = cast;
+            }
         }
 
         public static int GetIntrinsicByteSizeFromName(string ty)
@@ -1441,7 +1489,7 @@ namespace PxPre.SynthSyn
 
                         ValueRef vrLeft = this.BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
 
-                        if(vrLeft.valLoc == ValueLoc.LocalIdx)
+                        if (vrLeft.valLoc == ValueLoc.LocalIdx)
                         { 
                             ValueRef vrRight = this.BuildBSFunctionExpression(fnd, expr.branches[1], wasmBuild, ctxBuilder, fnBuild);
                             vrRight.PutInstrinsicValueOnStack(fnBuild); // Currently only handling intrinsic values
@@ -1497,7 +1545,7 @@ namespace PxPre.SynthSyn
                             return new ValueRef(ValueLoc.NoValue, -1, -1, vrLeft.varType);
                         }
                         else
-                            throw new SynthExceptionCompile("Setting non-local variables currently not supported.");
+                            throw new SynthExceptionCompile($"Setting non-local variables at {vrLeft.valLoc} currently not supported.");
                     }
 
                 case TokenASTType.GetGlobalVar:
@@ -2198,231 +2246,36 @@ namespace PxPre.SynthSyn
                     }
                     break;
 
-                case TokenASTType.UIntToFloat:
+                case TokenASTType.ExplicitCast:
                     {
+                        if (expr.branches.Count != 1)
+                            throw new SynthExceptionImpossible("Attempting to cast with unexpected number of branches.");
+
+                        // All explicit intrinsic casts should be supported, so no validation should be necessary.
+
+                        SynthType styCastTo = expr.evaluatingType;
                         ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
                         vr.PutInstrinsicValueOnStack(fnBuild);
-
-                        fnBuild.AddInstr(WASM.Instruction.f32_convert_i32_u);
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
+                        CastIntrinsicOnStack(vr.varType, styCastTo, fnBuild);
+                        return new ValueRef(ValueLoc.ValueOnStack, -1, -1, styCastTo);
                     }
 
-                case TokenASTType.UIntToDouble:
+                case TokenASTType.ImplicitCast:
                     {
+                        if (expr.branches.Count != 1)
+                            throw new SynthExceptionImpossible("Attempting to cast with unexpected number of branches.");
+
+                        SynthType styCastTo = expr.evaluatingType;
                         ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
                         vr.PutInstrinsicValueOnStack(fnBuild);
 
-                        fnBuild.AddInstr(WASM.Instruction.f64_convert_i32_u);
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
+                        // TODO: Validate the cast is proper.
+                        // Certain casting are not allowed, or only allowed if expr.branches[0].manifest
+                        // is a const.
+
+                        CastIntrinsicOnStack(vr.varType, styCastTo, fnBuild);
+                        return new ValueRef(ValueLoc.ValueOnStack, -1, -1, styCastTo);
                     }
-
-                case TokenASTType.UIntToUInt64:
-                    {
-                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
-                        vr.PutInstrinsicValueOnStack(fnBuild);
-
-                        fnBuild.AddInstr(WASM.Instruction.i64_extend_i32_u);
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
-                    }
-
-                case TokenASTType.SIntToSInt64:
-                    {
-                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
-                        vr.PutInstrinsicValueOnStack(fnBuild);
-
-                        fnBuild.AddInstr(WASM.Instruction.i64_extend_i32_s);
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
-                    }
-
-                case TokenASTType.FloatToUInt:
-                    {
-                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
-                        vr.PutInstrinsicValueOnStack(fnBuild);
-
-                        ctxBuilder.PopType(expr.branches[0].evaluatingType);
-                        ctxBuilder.PushType(expr.evaluatingType);
-                        fnBuild.AddInstr(WASM.Instruction.i32_trunc_f32_u);
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, expr.evaluatingType);
-                    }
-
-                case TokenASTType.FloatToSInt:
-                    break;
-
-                case TokenASTType.FloatToSInt64:
-                    break;
-
-                case TokenASTType.FloatToUInt64:
-                    break;
-
-                case TokenASTType.FloatToFloat64:
-                    break;
-
-                case TokenASTType.DoubleToUInt:
-                    break;
-
-                case TokenASTType.DoubleToSInt:
-                    break;
-
-                case TokenASTType.DoubleToSInt64:
-                    break;
-
-                case TokenASTType.DoubleToUInt64:
-                    break;
-
-                case TokenASTType.DoubleToFloat:
-                    break;
-
-                case TokenASTType.Cast_Int:
-                    {
-                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
-                        if(vr.varType.intrinsic == false)
-                            throw new SynthExceptionSyntax(expr.token, $"Cannot convert type {vr.varType.typeName} to int.");
-
-                        vr.PutInstrinsicValueOnStack(fnBuild);
-
-                        switch (vr.varType.typeName)
-                        {
-                            case "bool":
-                            case "int8":
-                            case "uint8":
-                            case "int16":
-                            case "uint16":
-                            case "int":
-                            case "uint":
-                                break;
-
-                            case "int64":
-                            case "uint64":
-                                fnBuild.AddInstr(WASM.Instruction.i32_wrap_i64);
-                                break;
-
-                            case "float":
-                                fnBuild.AddInstr(WASM.Instruction.i32_trunc_f32_s);
-                                break;
-
-                            case "float64":
-                                fnBuild.AddInstr(WASM.Instruction.i32_trunc_f64_s);
-                                break;
-                        }
-
-                        //fnbc.Add((byte)WASM.Instruction.i64_extend_i32_s);
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, fnd.GetType("int"));
-                    }
-
-                case TokenASTType.Cast_UInt:
-                    break;
-
-                case TokenASTType.Cast_Int8:
-                    {
-                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
-                        if(vr.varType.intrinsic == false)
-                            throw new SynthExceptionSyntax(expr.token, $"Cannot convert type {vr.varType.typeName} to int8.");
-
-                        vr.PutInstrinsicValueOnStack(fnBuild);
-
-                        switch(vr.varType.typeName)
-                        { 
-                            case "bool":
-                            case "int8":
-                            case "uint8":
-                            case "int16":
-                            case "uint16":
-                            case "int":
-                            case "uint":
-                                // For now all non-float types that are 4 bytes or less are 
-                                // treated the same.
-                                break;
-
-                            case "int64":
-                            case "uint64":
-                                fnBuild.AddInstr(WASM.Instruction.i32_wrap_i64);
-                                break;
-
-                            case "float":
-                                fnBuild.AddInstr(WASM.Instruction.i32_trunc_f32_s);
-                                break;
-
-                            case "float64":
-                                fnBuild.AddInstr(WASM.Instruction.i32_trunc_f64_s);
-                                break;
-                        }
-
-                        //fnbc.Add((byte)WASM.Instruction.i64_extend_i32_s);
-                        return new ValueRef(ValueLoc.ValueOnStack, 0, 0, fnd.GetType("int8"));
-                    }
-
-                case TokenASTType.Cast_UInt8:
-                    break;
-
-                case TokenASTType.Cast_Int16:
-                    break;
-
-                case TokenASTType.Cast_UInt16:
-                    break;
-
-                case TokenASTType.Cast_Int64:
-                    break;
-
-                case TokenASTType.Cast_UInt64:
-                    break;
-
-                case TokenASTType.Cast_Float:
-                    { 
-                        if(expr.branches.Count != 1)
-                            throw new SynthExceptionImpossible("Attempting to cast float with unexpected number of branches.");
-
-                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
-
-                        if(vr.valLoc != ValueLoc.ValueOnStack)
-                            throw new SynthExceptionCompile("Only stack conversions are currently allowed.");
-
-                        vr.PutInstrinsicValueOnStack(fnBuild);
-
-                        switch (vr.varType.typeName)
-                        { 
-                            case "float":
-                                return vr;
-
-                            case "float64":
-                                fnBuild.AddInstr(WASM.Instruction.f32_demote_f64);
-                                break;
-
-                            case "uint8":
-                            case "uint16":
-                            case "uint":
-                                fnBuild.AddInstr(WASM.Instruction.f32_convert_i32_u);
-                                break;
-
-                            case "int8":
-                                fnBuild.AddInstr(WASM.Instruction.i32_extend8_s);
-                                fnBuild.AddInstr(WASM.Instruction.f32_convert_i32_s);
-                                break;
-
-                            case "int16":
-                                fnBuild.AddInstr(WASM.Instruction.i32_extend16_s);
-                                fnBuild.AddInstr(WASM.Instruction.f32_convert_i32_s);
-                                break;
-
-                            case "int":
-                                fnBuild.AddInstr(WASM.Instruction.f32_convert_i32_s);
-                                break;
-
-                            case "int64":
-                                fnBuild.AddInstr(WASM.Instruction.f32_convert_i64_s);
-                                break;
-
-                            case "uint64":
-                                fnBuild.AddInstr(WASM.Instruction.f32_convert_i64_u);
-                                break;
-
-                            default:
-                                throw new SynthExceptionSyntax(expr.token, $"Cast to float not supported for type {vr.varType.typeName}.");
-                        }
-                        return new ValueRef(ValueLoc.ValueOnStack, -1, -1, fnd.GetType("float"));
-                    }
-
-                case TokenASTType.Cast_Double:
-                    break;
 
                 case TokenASTType.Compare_Eq:
                     break;
@@ -2562,6 +2415,208 @@ namespace PxPre.SynthSyn
             }
 
             throw new SynthExceptionImpossible($"Unhandled AST type {expr.astType}.");
+        }
+
+        /// <summary>
+        /// When an intrinsic value is on the stack, emit the proper WASM assembly to
+        /// convert the value to another intrinsic type.
+        /// </summary>
+        /// <param name="styOrig">The original type on the stack.</param>
+        /// <param name="styCastTo">The type to convert the value to.</param>
+        /// <param name="build">The WASM program to emit the casting instructions to.</param>
+        public void CastIntrinsicOnStack(SynthType styOrig, SynthType styCastTo, WASMByteBuilder build)
+        { 
+            CastIntrinsicOnStack(styOrig.typeName, styCastTo.typeName, build);
+        }
+
+        /// <summary>
+        /// When an intrinsic value is on the stack, emit the proper WASM assembly to
+        /// convert the value to another intrinsic type.
+        /// </summary>
+        /// <param name="styOrig">The name of the original type on the stack.</param>
+        /// <param name="styCastTo">The name of the type to convert the value to.</param>
+        /// <param name="build">The WASM program to emit the casting instructions to.</param>
+        public void CastIntrinsicOnStack(string styOrig, string styCastTo, WASMByteBuilder build)
+        { 
+            if(styOrig == styCastTo)
+                return;
+
+            // More-or-less, this is creating a grid of all intrinsic types and 
+            //addressing each pair combination.
+
+            switch(styOrig)
+            { 
+                case "bool":
+                case "int8":
+                case "int16":
+                case "int":
+                    switch(styCastTo)
+                    { 
+                        case "uint8":
+                        case "uint16":
+                        case "uint":
+                        case "bool":
+                        case "int8":
+                        case "int16":
+                        case "int":
+                            // NOTE: Arguably we could & mask the higher bits to truncate properly
+                            return;
+                        case "int64":
+                            build.AddInstr(WASM.Instruction.i64_extend_i32_s);
+                            return;
+                        case "uint64":
+                            build.AddInstr(WASM.Instruction.i64_extend_i32_u);
+                            return;
+                        case "float":
+                            build.AddInstr(WASM.Instruction.f32_convert_i32_s);
+                            return;
+                        case "float64":
+                            build.AddInstr(WASM.Instruction.f64_convert_i32_s);
+                            break;
+                    }
+                    break;
+
+                case "uint8":
+                case "uint16":
+                case "uint":
+                    switch(styCastTo)
+                    {
+                        case "uint8":
+                        case "uint16":
+                        case "uint":
+                        case "bool":
+                        case "int8":
+                        case "int16":
+                        case "int":
+                            // NOTE: Arguably we could & mask the higher bits to truncate properly
+                            return;
+                        case "int64":
+                            build.AddInstr(WASM.Instruction.i64_extend_i32_s);
+                            return;
+                        case "uint64":
+                            build.AddInstr(WASM.Instruction.i64_extend_i32_u);
+                            return;
+                        case "float":
+                            build.AddInstr(WASM.Instruction.f32_convert_i32_u);
+                            return;
+                        case "float64":
+                            build.AddInstr(WASM.Instruction.f64_convert_i32_u);
+                            return;
+                    }
+                    break;
+
+                case "int64":
+                    switch (styCastTo)
+                    {
+                        case "bool":
+                        case "int8":
+                        case "int16":
+                        case "int":
+                        case "uint8":
+                        case "uint16":
+                        case "uint":
+                            build.AddInstr(WASM.Instruction.i32_wrap_i64);
+                            // NOTE: Arguably we could & mask the higher bits to truncate 
+                            // properly for the datatypes that have a bitwidth less than 32.
+                            return;
+                        case "uint64":
+                            return;
+                        case "float":
+                            build.AddInstr(WASM.Instruction.f32_convert_i64_s);
+                            return;
+                        case "float64":
+                            build.AddInstr(WASM.Instruction.f64_convert_i64_s);
+                            return;
+                    }
+                    break;
+
+                case "uint64":
+                    switch(styCastTo)
+                    { 
+                        case "bool":
+                        case "int8":
+                        case "int16":
+                        case "int":
+                        case "uint8":
+                        case "uint16":
+                        case "uint":
+                            build.AddInstr(WASM.Instruction.i32_wrap_i64);
+                            // NOTE: Arguably we could & mask the higher bits to truncate 
+                            // properly for the datatypes that have a bitwidth less than 32.
+                            return;
+                        case "int64":
+                            return;
+                        case "float":
+                            build.AddInstr(WASM.Instruction.f32_convert_i64_u);
+                            return;
+                        case "float64":
+                            build.AddInstr(WASM.Instruction.f64_convert_i64_u);
+                            return;
+                    }
+                    break;
+
+                case "float":
+                    switch(styCastTo)
+                    { 
+                        case "bool":
+                        case "int8":
+                        case "int16":
+                        case "int":
+                            build.AddInstr(WASM.Instruction.i32_trunc_f32_s);
+                            // NOTE: Arguably we could & mask the higher bits to truncate 
+                            // properly for the datatypes that have a bitwidth less than 32.
+                            return;
+                        case "uint8":
+                        case "uint16":
+                        case "uint":
+                            build.AddInstr(WASM.Instruction.i32_trunc_f32_u);
+                            // NOTE: Arguably we could & mask the higher bits to truncate 
+                            // properly for the datatypes that have a bitwidth less than 32.
+                            return;
+                        case "int64":
+                            build.AddInstr(WASM.Instruction.i64_trunc_f32_s);
+                            return;
+                        case "uint64":
+                            build.AddInstr(WASM.Instruction.i64_trunc_f32_u);
+                            return;
+                        case "float64":
+                            build.AddInstr(WASM.Instruction.f64_promote_f32);
+                            return;
+                    }
+                    break;
+
+                case "double":
+                    switch(styCastTo)
+                    { 
+                        case "bool":
+                        case "int8":
+                        case "int16":
+                        case "int":
+                            build.AddInstr(WASM.Instruction.i32_trunc_f64_s);
+                            // NOTE: Arguably we could & mask the higher bits to truncate 
+                            // properly for the datatypes that have a bitwidth less than 32.
+                            return;
+                        case "uint8":
+                        case "uint16":
+                        case "uint":
+                            build.AddInstr(WASM.Instruction.i32_trunc_f64_u);
+                            // NOTE: Arguably we could & mask the higher bits to truncate 
+                            // properly for the datatypes that have a bitwidth less than 32.
+                            return;
+                        case "int64":
+                            build.AddInstr(WASM.Instruction.i64_trunc_f64_s);
+                            return;
+                        case "uint64":
+                            build.AddInstr(WASM.Instruction.i64_trunc_f64_u);
+                            return;
+                        case "float":
+                            build.AddInstr(WASM.Instruction.f32_demote_f64);
+                            return;
+                    }
+                    break;
+            }
+
+            throw new SynthExceptionImpossible($"Unable to cast intrinsic type from {styOrig} to {styCastTo}.");
         }
 
         /// <summary>

@@ -1,0 +1,40 @@
+//
+// >> Name: "Cast Float->Int 003"
+// >> Results: {11, 20, 167, 142}
+//
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+struct TestStruct()
+{
+	float x;
+	float y;
+	
+	TestStruct()
+	{
+		this.x = 5.9f;
+		this.y = 9.5f;
+	}
+	
+	int GetIntSquare1()
+	{
+		return (int)(x * y);
+	}
+	
+	int GetIntSquare2()
+	{
+		return (int)x * (int)y;
+	}
+}
+
+entry DoTest()
+{
+	TestStruct ts;
+	
+	LogTest(ts.GetIntSquare1());
+	LogTest(ts.GetIntSquare2());
+	LogTest((int)ts.x);
+
+	EndTest();
+}

@@ -1,0 +1,16 @@
+//
+// >> Name: "Cast Float->Int 002"
+// >> Results: {11}
+//
+
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	// Test a float->int from an expression
+	LogTest((int)(5.5f + 5.5f));
+
+	EndTest();
+}

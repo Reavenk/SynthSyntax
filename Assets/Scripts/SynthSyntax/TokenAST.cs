@@ -59,6 +59,26 @@ namespace PxPre.SynthSyn
             throw new SynthExceptionImpossible("Could not combine data source manifests.");
         }
 
+        public static DataManifest CastManifest(DataManifest orig)
+        { 
+            switch(orig)
+            { 
+                case DataManifest.NoData:
+                    throw new SynthExceptionImpossible("Attempted to convert manifest of cast that contains no data.");
+
+                case DataManifest.Procedural:
+                    return DataManifest.Procedural;
+
+                case DataManifest.ValueConst:
+                    return DataManifest.ValueConst;
+
+                case DataManifest.ValueExplicit:
+                    return DataManifest.Procedural;
+            }
+
+            throw new SynthExceptionImpossible("Attempted cast the manifest of unknown type.");
+        }
+
         public static DataManifest CombineManifests(TokenAST a, TokenAST b)
         { 
             return CombineManifests(a.manifest, b.manifest);

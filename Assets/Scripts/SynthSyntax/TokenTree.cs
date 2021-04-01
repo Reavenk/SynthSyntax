@@ -473,7 +473,7 @@ namespace PxPre.SynthSyn
                 if(nodes.Count == 1)
                     return retParen;
 
-                if(retParen.keyword != null)
+                if(string.IsNullOrEmpty(retParen.keyword) == true)
                     throw new SynthExceptionSyntax(nodes[0].root, "Expected a cast, but did not find any expression to cast.");
 
                 List<TokenTree> castedExpr = nodes.GetRange(1, nodes.Count - 1);
