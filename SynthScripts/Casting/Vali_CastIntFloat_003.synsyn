@@ -1,0 +1,21 @@
+// Testing cast int->float
+//
+// Explicit casting isn't an effective operation, but should
+// still be allowed.
+//
+// >> Name: "Cast Int->Float 003"
+// >> Resultsf: {6.0, 12.0, 16}
+//
+
+
+extern void LogTestf(float loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	LogTestf((float)6);
+	LogTestf((float)(5 + 7));
+	LogTestf((float)(2 << 3));
+
+	EndTest();
+}

@@ -1,0 +1,23 @@
+// Testing cast int->float
+//
+// Bare-bones tests.
+//
+// >> Name: "Cast Int->Float 001"
+// >> Resultsf: {5.0, 100.0}
+//
+
+
+extern void LogTestf(float loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	// Test simple implicit casting.
+	LogTestf(5);
+	
+	// Test pulling integer from local variable for implicit casting.
+	int a = 100;
+	LogTestf(a);
+
+	EndTest();
+}

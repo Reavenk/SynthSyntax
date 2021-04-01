@@ -49,13 +49,25 @@ namespace Tests
         [Test]
         public void CastIntFloat_001()
         {
-            UnitTest_Utils.PerformContainedTest("SynthScripts/Casting/Vali_IntFloat_001.synsyn");
+            UnitTest_Utils.PerformContainedTest("SynthScripts/Casting/Vali_CastIntFloat_001.synsyn");
         }
 
         [Test]
         public void CastIntFloat_002()
         {
-            UnitTest_Utils.PerformContainedTest("SynthScripts/Casting/Vali_IntFloat_002.synsyn");
+            UnitTest_Utils.PerformContainedTest("SynthScripts/Casting/Vali_CastIntFloat_002.synsyn");
+        }
+
+        [Test]
+        public void CastIntFloat_003()
+        {
+            UnitTest_Utils.PerformContainedTest("SynthScripts/Casting/Vali_CastIntFloat_003.synsyn");
+        }
+
+        [Test]
+        public void CastIntFloat_004()
+        {
+            UnitTest_Utils.PerformContainedTest("SynthScripts/Casting/Vali_CastIntFloat_004.synsyn");
         }
     }
 }

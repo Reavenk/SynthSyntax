@@ -1,0 +1,35 @@
+// Testing cast int->float.
+//
+// Test pulling integers from structs before (implicitly) 
+// casting them to floats.
+//
+// >> Name: "Cast Int->Float 004"
+// >> Resultsf: {7.0, 11.0, 9.0}
+//
+
+
+extern void LogTestf(float loggedVal);
+extern void EndTest();
+
+struct IntStruct
+{
+	int a;
+	int b;
+	
+	IntStruct()
+	{
+		a = 7;
+		b = 11;
+	}
+}
+
+entry DoTest()
+{
+	IntStruct istr;
+	
+	LogTestf(istr.a);
+	LogTestf(istr.b);
+	LogTestf((istr.a + istr.b)/2.0f);
+
+	EndTest();
+}

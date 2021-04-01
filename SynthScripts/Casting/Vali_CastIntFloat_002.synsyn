@@ -1,0 +1,20 @@
+// Testing cast int->float
+//
+// Test a few expressions.
+//
+// >> Name: "Cast Int->Float 002"
+// >> Resultsf: {11.0, 5.1, 0.5}
+//
+
+
+extern void LogTestf(float loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	LogTestf(5 + 6);
+	LogTestf(5 + 0.1f);
+	LogTestf(5 * 0.1f);
+
+	EndTest();
+}
