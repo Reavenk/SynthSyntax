@@ -9,7 +9,7 @@ namespace PxPre.SynthSyn
     /// Represents a declaration of a variable type, with an optional phrase
     /// for its default value.
     /// </summary>
-    public class SynthVarValue : SynthObj
+    public class SynVarValue : SynObj
     {
         public enum VarValueDataType
         { 
@@ -47,7 +47,10 @@ namespace PxPre.SynthSyn
 
         public VarLocation varLoc;
 
+        //public int pointerLevel = 0;
+
         public List<Token> declPhrase;
+
         public int declBaseEnd = -1; // Where does the base declaraction end?
 
         /// <summary>
@@ -60,7 +63,7 @@ namespace PxPre.SynthSyn
 
         // If the variable is initialized inline - what are the values initialized to. If the variable
         // doesn't have any member (is an intrinsic) then use the string key "this".
-        public Dictionary<string, SynthVarValue> childrenValues;
+        public Dictionary<string, SynVarValue> childrenValues;
 
         /// <summary>
         /// Given a set of tokens, parse the data of a variable declaration, with a 
@@ -75,7 +78,7 @@ namespace PxPre.SynthSyn
         /// <returns>The parsed variable declaration, or null if a variable declaration
         /// was not found. If parsing is sure we're parsing a variable declaration but it
         /// has been detected to be malformed, an exception is thrown.</returns>
-        public static SynthVarValue Parse(List<Token> tokens, string sentinel, bool sentinelEnd, OuterScope scope)
+        public static SynVarValue Parse(List<Token> tokens, string sentinel, bool sentinelEnd, OuterScope scope)
         { 
             int idx = 0;
 
@@ -92,7 +95,7 @@ namespace PxPre.SynthSyn
                 return null;
 
             string typeName = tokens[idx].fragment;
-            SynthVarValue.VarValueDataType dataType = VarValueDataType.Value;
+            SynVarValue.VarValueDataType dataType = VarValueDataType.Value;
             string varName = "";
 
             ++idx;
@@ -133,7 +136,7 @@ namespace PxPre.SynthSyn
                     throw new SynthExceptionSyntax(tokens[idx], $"Invalid ending to variable declaration.");
             }
 
-            SynthVarValue ret   = new SynthVarValue();
+            SynVarValue ret   = new SynVarValue();
             ret.typeName        = typeName;
             ret.varName         = varName;
             ret.declPhrase      = tokens.GetRange(0, idx);
@@ -155,7 +158,7 @@ namespace PxPre.SynthSyn
             return ret;
         }
 
-        public static SynthVarValue ParseBodyVar(List<Token> tokens, OuterScope scope)
+        public static SynVarValue ParseBodyVar(List<Token> tokens, OuterScope scope)
         {
             if(scope == OuterScope.Parameter)
                 throw new SynthExceptionImpossible($"At line {tokens[0].line}, attempting to parse body variable with parameter scope.");
@@ -171,12 +174,12 @@ namespace PxPre.SynthSyn
         /// the variable is found in local scope, it can still be made into a global variable if
         /// it starts with the static keyword.</param>
         /// <returns></returns>
-        public static SynthVarValue ParseParameter(List<Token> tokens)
+        public static SynVarValue ParseParameter(List<Token> tokens)
         { 
             return Parse(tokens, ",", true, OuterScope.Parameter);
         }
 
-        public static SynthVarValue ParseExposedParam(List<Token> tokens)
+        public static SynVarValue ParseExposedParam(List<Token> tokens)
         { 
             if(tokens[0].Matches(TokenType.tyWord, "param") == false)
                 return null;
@@ -186,7 +189,7 @@ namespace PxPre.SynthSyn
 
             tokens.RemoveAt(0);
 
-            SynthVarValue ret = ParseBodyVar(tokens, OuterScope.Global);
+            SynVarValue ret = ParseBodyVar(tokens, OuterScope.Global);
             if(ret == null)
                 throw new SynthExceptionSyntax(line, "Param syntax error");
 
@@ -214,7 +217,7 @@ namespace PxPre.SynthSyn
             }
         }
 
-        public override SynthVarValue CastVarDecl()
+        public override SynVarValue CastVarDecl()
         {
             return this;
         }

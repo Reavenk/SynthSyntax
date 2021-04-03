@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace PxPre.SynthSyn
 {
-    public class SynthStringRepo
+    public class SynStringRepo
     {
         // UTF16;
         const int BytesPerChar = 2; 

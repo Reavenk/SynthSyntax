@@ -43,7 +43,7 @@ namespace PxPre.SynthSyn
             this.keyword = keyword;
         }
 
-        public static TokenTree EatTokensIntoTree(List<Token> tokens, SynthScope scope, bool rootExpression)
+        public static TokenTree EatTokensIntoTree(List<Token> tokens, SynScope scope, bool rootExpression)
         {
             // When we start processing the tokens here, these are already
             // single-line expressions that have been separated by semicolons.
@@ -63,23 +63,39 @@ namespace PxPre.SynthSyn
                 if(tokens[0].Matches(TokenType.tyWord) == true)
                 { 
                     SynType sty = scope.GetType(tokens[0].fragment);
+                    // If we find a root expression starting with a known datatype, 
+                    // then yes, a local variable is being declared.
                     if(sty != null)
                     { 
+                        int idx = 0;
                         TokenTree ttVarDecl = new TokenTree(keyVarDecl);
-                        ttVarDecl.root = tokens[0];
+                        ttVarDecl.root = tokens[idx];
+                        ++idx;
+
+                        // We're going to store the pointer level as a record of the @ tokens
+                        // in the toksToProcess. These shouldn't be evaluated, but should be 
+                        // counted layer when declaring the actual variable.
+                        while(tokens[idx].MatchesSymbol("@") == true)
+                        {
+                            ttVarDecl.toksToProcess.Add(tokens[idx]);
+                            ++idx;
+                        }
 
                         TokenTree ttName = new TokenTree("varname");
-                        ttName.root = tokens[1];
+                        ttName.root = tokens[idx];
+                        ++idx;
 
                         ttVarDecl.nodes.Add(ttName);
 
                         if(tokens.Count > 2)
                         { 
                             
-                            if(tokens.Count < 4 || tokens[2].MatchesSymbol("=") == false)
-                                throw new SynthExceptionSyntax(tokens[2], "Invalid syntax for declaring local variable.");
+                            if(tokens.Count < 4 || tokens[idx].MatchesSymbol("=") == false)
+                                throw new SynthExceptionSyntax(tokens[idx], "Invalid syntax for declaring local variable.");
 
-                            List<Token> setExpr = tokens.GetRange(3, tokens.Count - 3);
+                            ++idx;
+
+                            List<Token> setExpr = tokens.GetRange(idx, tokens.Count - idx);
                             ttVarDecl.nodes.Add(EatTokensIntoTree(setExpr, scope, false));
 
                         }
@@ -280,7 +296,7 @@ namespace PxPre.SynthSyn
             return ConsolidateTokenTree(nodes, scope, false);
         }
 
-        public static TokenTree ConsumeBody(List<Token> tokens, int bodyStart, SynthScope scope)
+        public static TokenTree ConsumeBody(List<Token> tokens, int bodyStart, SynScope scope)
         { 
             TokenTree ret = new TokenTree("body");
 
@@ -313,7 +329,7 @@ namespace PxPre.SynthSyn
             return ret;
         }
 
-        public static TokenTree ConsolidateTokenTree(List<TokenTree> nodes, SynthScope scope, bool rootExpression)
+        public static TokenTree ConsolidateTokenTree(List<TokenTree> nodes, SynScope scope, bool rootExpression)
         { 
             while (nodes.Count > 0)
             { 
@@ -486,6 +502,21 @@ namespace PxPre.SynthSyn
             if (nodes.Count == 1)
                 return nodes[0];
 
+            // The @ should be handled right before the "." is handled.
+            if (nodes[0].root.MatchesSymbol("@") == true)
+            {
+                TokenTree ttRet = nodes[0];
+                //
+                nodes.RemoveAt(0);
+
+                if(nodes.Count == 0)
+                    throw new System.Exception("@ missing defining expression."); // NOTE: Should probably clean up the lingo.
+
+                ttRet.nodes.Add(ConsolidateTokenTree(nodes, scope, false));
+
+                return ttRet;
+            }
+
             // TODO:
             // To be refactored for more rigerous syntax processing. Right now we 
             // work from the backwards inwards; but really at this point we should 
@@ -569,7 +600,7 @@ namespace PxPre.SynthSyn
                 }
             }
 
-            if (nodes[0].root.Matches(TokenType.tySymbol, "-") == true)
+            if (nodes[0].root.Matches(TokenType.tySymbol, "-") == true) // TODO: Change the .MatchesSymbol
             {
                 if(nodes.Count != 2)
                     throw new SynthExceptionSyntax(nodes[0].root, "Negation used with unexpected syntax.");
@@ -601,7 +632,7 @@ namespace PxPre.SynthSyn
             throw new SynthExceptionSyntax(nodes[0].root, "Unknown syntax.");
         }
 
-        public static TokenTree CreatePivot(List<TokenTree> nodes, int idx, SynthScope scope, bool rootExpression)
+        public static TokenTree CreatePivot(List<TokenTree> nodes, int idx, SynScope scope, bool rootExpression)
         {
             ThrowIfAtEdge(nodes, idx);
 

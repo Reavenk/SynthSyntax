@@ -29,11 +29,11 @@ namespace PxPre.SynthSyn
         public class FunctionInfo
         { 
             public readonly int typeIndex;
-            public readonly SynthFuncDecl function;
+            public readonly SynFuncDecl function;
             public uint functionIndex;
             public bool imported;
 
-            public FunctionInfo(SynthFuncDecl function, int typeIndex, bool imported)
+            public FunctionInfo(SynFuncDecl function, int typeIndex, bool imported)
             { 
                 this.function = function;
                 this.typeIndex = typeIndex;
@@ -55,21 +55,21 @@ namespace PxPre.SynthSyn
         public List<FunctionType> functionTypes = new List<FunctionType>();
 
         public List<FunctionInfo> functionInfos = new List<FunctionInfo>();
-        public Dictionary<SynthFuncDecl, FunctionInfo> functionLookup = new Dictionary<SynthFuncDecl, FunctionInfo>();
+        public Dictionary<SynFuncDecl, FunctionInfo> functionLookup = new Dictionary<SynFuncDecl, FunctionInfo>();
 
-        public SynthContext rootContext;
+        public SynContext rootContext;
 
-        public SynthStringRepo stringRepo = new SynthStringRepo();
+        public SynStringRepo stringRepo = new SynStringRepo();
 
         public readonly int stackMemByteCt = 1024;
 
-        public WASMBuild(SynthContext rootContext, int stackMemByteCt = 1024)
+        public WASMBuild(SynContext rootContext, int stackMemByteCt = 1024)
         { 
             this.rootContext = rootContext;
             this.stackMemByteCt = stackMemByteCt;
         }
 
-        public FunctionType TurnFnTypeIntoWASMType(SynthFuncDecl fnd)
+        public FunctionType TurnFnTypeIntoWASMType(SynFuncDecl fnd)
         {
             WASM.Bin.TypeID retTy = GetTrueParamReturnType(fnd.returnType);
             List<WASM.Bin.TypeID> paramTy = new List<WASM.Bin.TypeID>();
@@ -176,14 +176,14 @@ namespace PxPre.SynthSyn
             throw new SynthExceptionImpossible("Could not convert synth type to true WASM type.");
         }
 
-        public int IndexFnTypeIntoWASMType(SynthFuncDecl fnd)
+        public int IndexFnTypeIntoWASMType(SynFuncDecl fnd)
         { 
             return TurnFnTypeIntoWASMType(fnd).index;
         }
 
-        public void RegisterFunction(SynthFuncDecl fn)
+        public void RegisterFunction(SynFuncDecl fn)
         {
-            SynthLog.Log($"Registering function {fn.functionName}.");
+            SynLog.Log($"Registering function {fn.functionName}.");
 
             if(this.functionLookup.ContainsKey(fn) == true)
                 throw new SynthExceptionImpossible("");
@@ -198,7 +198,7 @@ namespace PxPre.SynthSyn
 
         public void RealignFunctions()
         {
-            SynthLog.Log($"Realigning function indices.");
+            SynLog.Log($"Realigning function indices.");
 
             List<FunctionInfo> origFnInfos = this.functionInfos;
 
@@ -258,7 +258,7 @@ namespace PxPre.SynthSyn
             return this.functionInfos.GetRange(idx, this.functionInfos.Count - idx);
         }
 
-        public uint ? GetFunctionIndex(SynthFuncDecl fn)
+        public uint ? GetFunctionIndex(SynFuncDecl fn)
         { 
             FunctionInfo fi;
             if(this.functionLookup.TryGetValue(fn, out fi) == false)
@@ -269,7 +269,7 @@ namespace PxPre.SynthSyn
 
         public byte[] BuildWASM()
         {
-            SynthLog.LogHeader("Entered BuildWASM() from SynthContext.cs");
+            SynLog.LogHeader("Entered BuildWASM() from SynthContext.cs");
 
             //WASMBuild build = new WASMBuild(this);
 
@@ -542,7 +542,7 @@ namespace PxPre.SynthSyn
                 for (int i = 0; i < lstLocalFns.Count; ++i)
                 {
                     FunctionInfo finfo = lstLocalFns[i];
-                    SynthFuncDecl fn = finfo.function;
+                    SynFuncDecl fn = finfo.function;
 
                     if (fn.fnBin == null)
                         throw new SynthExceptionImpossible($"Attempting to save out WASM of function {fn.functionName} that hasn't been processed.");
@@ -587,14 +587,14 @@ namespace PxPre.SynthSyn
         }
 
         // TODO: Perhaps this function should be moved into WASMBuild?
-        public SynthContextBuilder BuildFunction(SynthFuncDecl fnd)
+        public SynNestingBuilder BuildFunction(SynFuncDecl fnd)
         {
-            SynthContextBuilder builder = new SynthContextBuilder(null);
+            SynNestingBuilder builder = new SynNestingBuilder(null);
 
             if (fnd.ast != null)
                 throw new SynthExceptionImpossible($"Attempting to build function {fnd.functionName} AST multiple times.");
 
-            SynthLog.Log($"Entered SynthFuncDecl.Build() for {fnd.functionName}.");
+            SynLog.Log($"Entered SynthFuncDecl.Build() for {fnd.functionName}.");
 
             // NOTE: For now functions are non-typed (in the SynthSyn language) and 
             // are non addressable.
@@ -608,27 +608,27 @@ namespace PxPre.SynthSyn
                     false,
                     AST.DataManifest.NoData);
 
-            SynthLog.Log($"Building function AST for {fnd.functionName}.");
-            SynthLog.Log("");
+            SynLog.Log($"Building function AST for {fnd.functionName}.");
+            SynLog.Log("");
 
-            List<SynthContextBuilder> builders = new List<SynthContextBuilder>();
+            List<SynNestingBuilder> builders = new List<SynNestingBuilder>();
             builders.Add(builder);
 
             //List<TokenTree> treeLines = new List<TokenTree>();
             for (int i = 0; i < fnd.executingLines.Count; ++i)
             {
                 List<Token> execLine = fnd.executingLines[i];
-                SynthLog.LogFragments(execLine);
+                SynLog.LogFragments(execLine);
 
                 TokenTree rootLineNode = TokenTree.EatTokensIntoTree(execLine, fnd, true);
 
-                SynthLog.LogTree(rootLineNode);
+                SynLog.LogTree(rootLineNode);
 
                 // If it's a member function (not a static function) then full in the struct
                 // we belong to as a he invoking scope. Or else set it to null. Its syntax scope
                 // it still all the way where the source code is, but doesn't have a "this" member
                 // function.
-                SynthScope invokingScope = null;
+                SynScope invokingScope = null;
                 if (fnd.isStatic == false)
                     invokingScope = fnd.GetStructScope();
 
@@ -642,22 +642,22 @@ namespace PxPre.SynthSyn
             }
             fnd.ast.branches.Add(new AST(new Token(), builder, ASTOp.EndScope, builder, null, false, AST.DataManifest.NoData));
 
-            SynthLog.Log("");
-            SynthLog.Log($"Encountered {builders.Count} nested scopes.");
+            SynLog.Log("");
+            SynLog.Log($"Encountered {builders.Count} nested scopes.");
             for(int i = 0; i < builders.Count; ++i)
             {
-                SynthLog.LogIndent(0, $"Scope {i}");
-                SynthLog.LogIndent(1, $"Line number : {builders[i].lineNumber}");
-                SynthLog.LogIndent(1, $"Stack Elements : Ele {builders[i].locStkEle.Count} - Vars {builders[i].locStkVars.Count}");
-                SynthLog.LogIndent(1, $"Memory Stack : Vars {builders[i].memStkVars.Count}");
-                SynthLog.LogIndent(1, $"Total Memory Stack : Bytes {builders[i].totalMemoryStackBytes}");
+                SynLog.LogIndent(0, $"Scope {i}");
+                SynLog.LogIndent(1, $"Line number : {builders[i].lineNumber}");
+                SynLog.LogIndent(1, $"Stack Elements : Ele {builders[i].locStkEle.Count} - Vars {builders[i].locStkVars.Count}");
+                SynLog.LogIndent(1, $"Memory Stack : Vars {builders[i].memStkVars.Count}");
+                SynLog.LogIndent(1, $"Total Memory Stack : Bytes {builders[i].totalMemoryStackBytes}");
             }
 
-            SynthLog.Log("");
-            SynthLog.Log(fnd.ast.DumpDiagnostic());
+            SynLog.Log("");
+            SynLog.Log(fnd.ast.DumpDiagnostic());
 
-            SynthLog.Log($"Finished building AST : {fnd.functionName}.");
-            SynthLog.Log($"Converting AST to binary WASM : {fnd.functionName}.");
+            SynLog.Log($"Finished building AST : {fnd.functionName}.");
+            SynLog.Log($"Converting AST to binary WASM : {fnd.functionName}.");
 
             // Before the AST is turned into actual WASM binary, we need to finalize the
             // byte alignment and the indices of local stack variables. This is done with
@@ -681,7 +681,7 @@ namespace PxPre.SynthSyn
 
             // Gather all the local variables
             List<WASM.Bin.TypeID> localVarTys = new List<WASM.Bin.TypeID>();
-            foreach (SynthContextBuilder b in builders)
+            foreach (SynNestingBuilder b in builders)
             {
                 foreach (ValueRef stkVal in b.locStkEle)
                 {
@@ -747,7 +747,7 @@ namespace PxPre.SynthSyn
             fnBuild.Add_End();
             fnd.fnBin = fnBuild.Bin();
 
-            SynthLog.Log($"Exiting SynthFuncDecl.Build({fnd.functionName}).");
+            SynLog.Log($"Exiting SynthFuncDecl.Build({fnd.functionName}).");
             return builder;
         }
     }

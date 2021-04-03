@@ -18,13 +18,13 @@
         public SynthExceptionImpossible()
             : base()
         {
-            SynthLog.Log("IMPOSSIBLE!");
+            SynLog.Log("IMPOSSIBLE!");
         }
 
         public SynthExceptionImpossible(string why)
             : base(why)
         { 
-            SynthLog.Log("IMPOSSIBLE!: " + why);
+            SynLog.Log("IMPOSSIBLE!: " + why);
         }
 
     }

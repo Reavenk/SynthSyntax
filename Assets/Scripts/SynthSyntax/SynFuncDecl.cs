@@ -5,7 +5,7 @@ namespace PxPre.SynthSyn
     /// <summary>
     /// SynthSyntax Function declaration and definition.
     /// </summary>
-    public class SynthFuncDecl : SynthScope
+    public class SynFuncDecl : SynScope
     {
         [System.Flags]
         public enum ParseType
@@ -78,10 +78,10 @@ namespace PxPre.SynthSyn
         /// </summary>
         public SynType returnType;
 
-        public SynthFuncParamSet parameterSet = new SynthFuncParamSet();
+        public SynFuncParamSet parameterSet = new SynFuncParamSet();
 
-        public List<SynthRegion> regionList = new List<SynthRegion>();
-        public Dictionary<string, SynthRegion> regionLookup = new Dictionary<string, SynthRegion>();
+        public List<SynRegion> regionList = new List<SynRegion>();
+        public Dictionary<string, SynRegion> regionLookup = new Dictionary<string, SynRegion>();
 
         /// <summary>
         /// Cache if the function is an operator.
@@ -166,12 +166,12 @@ namespace PxPre.SynthSyn
             get => this.callType == CallType.Extern;
         }
 
-        public SynthFuncDecl(SynthScope parentScope)
+        public SynFuncDecl(SynScope parentScope)
             : base(parentScope)
         { 
         }
 
-        public static SynthFuncDecl Parse(SynthScope parentScope, List<Token> tokens, string structName, bool isStatic, ParseType parseTypes)
+        public static SynFuncDecl Parse(SynScope parentScope, List<Token> tokens, string structName, bool isStatic, ParseType parseTypes)
         {
             bool isExtern = false;
             bool committed = false;
@@ -233,7 +233,7 @@ namespace PxPre.SynthSyn
                 int dstrIdx = idx;
                 Parser.MovePastScopeTSemi(ref dstrIdx, tokens);
 
-                SynthFuncDecl retDstr = new SynthFuncDecl(parentScope);
+                SynFuncDecl retDstr = new SynFuncDecl(parentScope);
                 retDstr.returnTyName = "";
                 retDstr.functionName = destructorName;
                 retDstr.callType = CallType.Destructor;
@@ -272,7 +272,7 @@ namespace PxPre.SynthSyn
                     int constrIdx = idx;
                     Parser.MovePastScopeTSemi(ref constrIdx, tokens);
 
-                    SynthFuncDecl retConstr     = new SynthFuncDecl(parentScope);
+                    SynFuncDecl retConstr     = new SynFuncDecl(parentScope);
                     retConstr.returnTyName      = "";
                     retConstr.functionName      = constructorName;
                     retConstr.callType          = CallType.Constructor;
@@ -383,7 +383,7 @@ namespace PxPre.SynthSyn
             if(typeName == "void")
                 typeName = string.Empty;
 
-            SynthFuncDecl ret = new SynthFuncDecl(parentScope);
+            SynFuncDecl ret = new SynFuncDecl(parentScope);
             ret.returnTyName    = typeName;
             ret.functionName    = fnName;
             ret.isReversible    = isReversible;
@@ -486,7 +486,7 @@ namespace PxPre.SynthSyn
 
             while(paramsPhrase.Count > 0) 
             { 
-                SynthVarValue varParam = SynthVarValue.ParseParameter(paramsPhrase);
+                SynVarValue varParam = SynVarValue.ParseParameter(paramsPhrase);
                 if (varParam == null)
                     throw new System.Exception($"Unexpected parameter declaration on line {paramsPhrase[0].line}.");
 
@@ -508,7 +508,7 @@ namespace PxPre.SynthSyn
 
             if(fnBodPhrase != null)
             {
-                SynthLog.Log("Parsing function body.");
+                SynLog.Log("Parsing function body.");
 
                 while (fnBodPhrase.Count > 0)
                 { 
@@ -523,7 +523,7 @@ namespace PxPre.SynthSyn
                         continue;
                     }
 
-                    SynthFuncDecl sfn = SynthFuncDecl.Parse(this, fnBodPhrase, "", false, ParseType.FunctionContext);
+                    SynFuncDecl sfn = SynFuncDecl.Parse(this, fnBodPhrase, "", false, ParseType.FunctionContext);
                     if(sfn != null)
                     { 
                         this.AddFunction(sfn);
@@ -540,25 +540,25 @@ namespace PxPre.SynthSyn
                     List<Token> execPhrase = fnBodPhrase.GetRange(0, idx);
                     fnBodPhrase.RemoveRange(0, idx);
 
-                    SynthLog.Log("Extracted function phrase:");
-                    SynthLog.LogFragments( execPhrase );
+                    SynLog.Log("Extracted function phrase:");
+                    SynLog.LogFragments( execPhrase );
 
                     this.executingLines.Add(execPhrase);
                 }
             }
 
-            SynthLog.Log($"Finished BreakApartParsedTokens for {this.functionName}.\n");
+            SynLog.Log($"Finished BreakApartParsedTokens for {this.functionName}.\n");
         }
 
         public override void Validate_AfterTypeAlignment(int logIndent)
         {
-            SynthLog.Log("");
-            SynthLog.LogIndent(logIndent, $"Started {this.functionName}.Validate_AfterTypeAlignment()");
+            SynLog.Log("");
+            SynLog.LogIndent(logIndent, $"Started {this.functionName}.Validate_AfterTypeAlignment()");
 
 
             //      VERIFY RETURN VALUE
             //////////////////////////////////////////////////
-            SynthLog.LogIndent(logIndent + 1, "Checking return value type:");
+            SynLog.LogIndent(logIndent + 1, "Checking return value type:");
             if (string.IsNullOrEmpty(this.returnTyName) == false)
             { 
                 SynType ret = this.GetType(this.returnTyName);
@@ -571,27 +571,27 @@ namespace PxPre.SynthSyn
                 }
                 
                 this.returnType = ret;
-                SynthLog.LogIndent(logIndent + 2, $"Verified return value {this.returnTyName} with {this.returnType.typeName}.");
+                SynLog.LogIndent(logIndent + 2, $"Verified return value {this.returnTyName} with {this.returnType.typeName}.");
 
             }
             else
-                SynthLog.LogIndent(logIndent + 2, "No return value.");
+                SynLog.LogIndent(logIndent + 2, "No return value.");
 
             //      VERIFY PARAMETER TYPES
             //////////////////////////////////////////////////
-            SynthLog.LogIndent(logIndent + 1, "Checking parameter types:");
+            SynLog.LogIndent(logIndent + 1, "Checking parameter types:");
 
             this.parameterSet._Validate(this);
 
             if(this.parameterSet.Count == 0)
             {
-                SynthLog.LogIndent(logIndent + 2, "No parameters.");
+                SynLog.LogIndent(logIndent + 2, "No parameters.");
             }
             else
             {
                 for (int i = 0; i < this.parameterSet.Count; ++i)
                 { 
-                    SynthVarValue svvParam = this.parameterSet.Get(i);
+                    SynVarValue svvParam = this.parameterSet.Get(i);
 
                     SynType p = this.GetType(svvParam.typeName);
                     if(p == null)
@@ -602,7 +602,7 @@ namespace PxPre.SynthSyn
                     }
 
                     svvParam.type = p;
-                    SynthLog.LogIndent(logIndent + 2, $"Verified parameter {i}, {svvParam.varName}, {p.typeName} with {svvParam.type.typeName}.");
+                    SynLog.LogIndent(logIndent + 2, $"Verified parameter {i}, {svvParam.varName}, {p.typeName} with {svvParam.type.typeName}.");
                 }
             }
 
@@ -612,17 +612,17 @@ namespace PxPre.SynthSyn
 
             base.Validate_AfterTypeAlignment(logIndent + 1);
 
-            SynthLog.LogIndent(logIndent, $"Ended {this.functionName}.Validate_AfterTypeAlignment()");
+            SynLog.LogIndent(logIndent, $"Ended {this.functionName}.Validate_AfterTypeAlignment()");
         }
 
-        public override SynthFuncDecl CastFuncDecl()
+        public override SynFuncDecl CastFuncDecl()
         {
             return this;
         }
 
-        public override SynthCanidateFunctions CastCanidateFunctions() 
+        public override SynCanidateFuncs CastCanidateFunctions() 
         { 
-            SynthCanidateFunctions retSelf = new SynthCanidateFunctions(this.GetStructScope());
+            SynCanidateFuncs retSelf = new SynCanidateFuncs(this.GetStructScope());
             retSelf.functions.Add(this);
             return retSelf;
         }
@@ -634,14 +634,14 @@ namespace PxPre.SynthSyn
             base.GatherFunctionRegistration(builds);
         }
 
-        public SynthVarValue GetParameter(string name)
+        public SynVarValue GetParameter(string name)
         {
             return this.parameterSet.Get(name);
         }
 
-        public override SynthVarValue GetVar(string name, bool recursion = true)
+        public override SynVarValue GetVar(string name, bool recursion = true)
         { 
-            SynthVarValue svvParam = GetParameter(name);
+            SynVarValue svvParam = GetParameter(name);
             if(svvParam != null)
                 return svvParam;
 

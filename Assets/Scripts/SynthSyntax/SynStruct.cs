@@ -13,7 +13,7 @@ namespace PxPre.SynthSyn
         public int byteSize = 0;
 
 
-        public SynStruct(SynthScope parentScope, string name)
+        public SynStruct(SynScope parentScope, string name)
             : base(parentScope, name, false)
         { 
         }
@@ -31,7 +31,7 @@ namespace PxPre.SynthSyn
             return resolvedAlignments;
         }
 
-        public static SynStruct Parse(SynthScope parentScope, List<Token> tokens)
+        public static SynStruct Parse(SynScope parentScope, List<Token> tokens)
         {
             if (tokens[0].Matches(TokenType.tyWord, "struct") == false)
                 return null;
@@ -58,8 +58,8 @@ namespace PxPre.SynthSyn
 
         public override void BreakApartParsedTokens()
         {
-            SynthLog.Log($"Breaking apart type {this.typeName}.");
-            SynthLog.LogFragments( this.declarationTokens);
+            SynLog.Log($"Breaking apart type {this.typeName}.");
+            SynLog.LogFragments( this.declarationTokens);
 
             // For struct structname { ... }, remove everything except the ...
             this.declarationTokens.RemoveRange(0, 3);
@@ -78,20 +78,20 @@ namespace PxPre.SynthSyn
                     continue;
                 }
 
-                SynthRegion rgn = SynthRegion.Parse(this, this.declarationTokens);
+                SynRegion rgn = SynRegion.Parse(this, this.declarationTokens);
                 if(rgn != null)
                 { 
                     this.regions.Add(rgn.name, rgn);
                     continue;
                 }
 
-                SynthFuncDecl fnParse = 
-                    SynthFuncDecl.Parse(
+                SynFuncDecl fnParse = 
+                    SynFuncDecl.Parse(
                         this, 
                         this.declarationTokens, 
                         this.typeName, 
                         false, 
-                        SynthFuncDecl.ParseType.StructContext);
+                        SynFuncDecl.ParseType.StructContext);
 
                 if (fnParse != null)
                 {
@@ -99,7 +99,7 @@ namespace PxPre.SynthSyn
                     continue;
                 }
 
-                SynthVarValue varParse = SynthVarValue.ParseBodyVar(this.declarationTokens, SynthVarValue.OuterScope.Struct);
+                SynVarValue varParse = SynVarValue.ParseBodyVar(this.declarationTokens, SynVarValue.OuterScope.Struct);
                 if(varParse != null)
                 { 
                     this.AddVariable(varParse);
@@ -175,7 +175,7 @@ namespace PxPre.SynthSyn
         { 
             foreach( var v in this.varDefs)
             {
-                if(v.dataType != SynthVarValue.VarValueDataType.Value)
+                if(v.dataType != SynVarValue.VarValueDataType.Value)
                     continue;
 
                 // If it's already been registered, don't do another registration
@@ -190,10 +190,10 @@ namespace PxPre.SynthSyn
 
         public override void Validate_AfterTypeAlignment(int logIndent)
         {
-            SynthLog.Log("");
-            SynthLog.LogIndent(logIndent, $"Begin Struct.Validate_AfterTypeAlignment : {this.typeName}");
+            SynLog.Log("");
+            SynLog.LogIndent(logIndent, $"Begin Struct.Validate_AfterTypeAlignment : {this.typeName}");
             base.Validate_AfterTypeAlignment(logIndent + 1);
-            SynthLog.LogIndent(logIndent, $"End Struct.Validate_AfterTypeAlignment");
+            SynLog.LogIndent(logIndent, $"End Struct.Validate_AfterTypeAlignment");
         }
 
         public override SynStruct GetStructScope()
@@ -201,13 +201,13 @@ namespace PxPre.SynthSyn
             return this;
         }
 
-        public override SynthFuncDecl GetDefaultConstructor()
+        public override SynFuncDecl GetDefaultConstructor()
         { 
-            List<SynthFuncDecl> lstFns;
+            List<SynFuncDecl> lstFns;
             if(this.functions.TryGetValue(this.typeName, out lstFns) == false)
                 return null;
 
-            foreach(SynthFuncDecl sfd in lstFns)
+            foreach(SynFuncDecl sfd in lstFns)
             { 
                 if(sfd.isConstructor == false)
                     continue;
@@ -222,9 +222,9 @@ namespace PxPre.SynthSyn
             return null;
         }
 
-        public override SynthFuncDecl GetDestructor()
+        public override SynFuncDecl GetDestructor()
         {
-            List<SynthFuncDecl> lstFn;
+            List<SynFuncDecl> lstFn;
             if(this.functions.TryGetValue("~" + this.typeName, out lstFn) == false)
                 return null;
 
@@ -246,21 +246,21 @@ namespace PxPre.SynthSyn
         /// create a default copy constructor and register it with the struct.
         /// </param>
         /// <returns>The found, or created, copy constructor for the struct.</returns>
-        public override SynthFuncDecl GetCopyConstructor(bool autocreate, SynthContextBuilder scb)
+        public override SynFuncDecl GetCopyConstructor(bool autocreate, SynNestingBuilder scb)
         { 
-            List<SynthFuncDecl> lstFns;
+            List<SynFuncDecl> lstFns;
             if(this.functions.TryGetValue(this.typeName, out lstFns) == false)
             { 
                 if(autocreate == false)
                     return null;
 
                 // If we're autocreating, prepare a list for it to be registered in.
-                lstFns = new List<SynthFuncDecl>();
+                lstFns = new List<SynFuncDecl>();
                 this.functions.Add(this.typeName, lstFns);
             }
             else
             { 
-                foreach(SynthFuncDecl fns in lstFns)
+                foreach(SynFuncDecl fns in lstFns)
                 { 
                     if(fns.returnType != null)
                         continue;
@@ -282,15 +282,15 @@ namespace PxPre.SynthSyn
                     return null;
             }
 
-            SynthFuncDecl sfdCC = new SynthFuncDecl(this);
+            SynFuncDecl sfdCC = new SynFuncDecl(this);
             //
-            SynthVarValue svvDst = new SynthVarValue();
-            svvDst.varLoc = SynthVarValue.VarLocation.ThisRef;
-            svvDst.dataType = SynthVarValue.VarValueDataType.Pointer;
+            SynVarValue svvDst = new SynVarValue();
+            svvDst.varLoc = SynVarValue.VarLocation.ThisRef;
+            svvDst.dataType = SynVarValue.VarValueDataType.Pointer;
             //
-            SynthVarValue svvSrc = new SynthVarValue();
-            svvSrc.varLoc = SynthVarValue.VarLocation.Parameter;
-            svvSrc.dataType = SynthVarValue.VarValueDataType.Reference;
+            SynVarValue svvSrc = new SynVarValue();
+            svvSrc.varLoc = SynVarValue.VarLocation.Parameter;
+            svvSrc.dataType = SynVarValue.VarValueDataType.Reference;
 
             sfdCC.parameterSet.AddParameter(svvDst);
             sfdCC.parameterSet.AddParameter(svvSrc);
@@ -303,7 +303,7 @@ namespace PxPre.SynthSyn
             // Go through each variable in order and copy them by producing the proper AST
             for(int i = 0; i < this.varDefs.Count; ++i)
             { 
-                SynthVarValue svv = this.varDefs[i];    // The member to copy
+                SynVarValue svv = this.varDefs[i];    // The member to copy
                 
                 if(svv.type.intrinsic == true)
                 {

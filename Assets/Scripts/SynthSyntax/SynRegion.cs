@@ -4,19 +4,19 @@ using UnityEngine;
 
 namespace PxPre.SynthSyn
 {
-    public class SynthRegion : SynthScope
+    public class SynRegion : SynScope
     { 
         public string name;
-        public SynthFuncDecl entry;
-        public SynthFuncDecl exit;
+        public SynFuncDecl entry;
+        public SynFuncDecl exit;
 
         public int bodyStart = -1;
 
-        public SynthRegion(SynthScope parent)
+        public SynRegion(SynScope parent)
             : base(parent)
         { }
 
-        public static SynthRegion Parse(SynthScope parentScope, List<Token> tokens)
+        public static SynRegion Parse(SynScope parentScope, List<Token> tokens)
         { 
             int idx = 0;
             if(tokens[idx].Matches(TokenType.tyWord, "region") == false)
@@ -37,7 +37,7 @@ namespace PxPre.SynthSyn
             int end = bodyStart;
             Parser.MovePastCurlScope(ref end, tokens);
 
-            SynthRegion ret = new SynthRegion(parentScope);
+            SynRegion ret = new SynRegion(parentScope);
             ret.name = scopeName;
             ret.bodyStart = bodyStart;
             ret.declPhrase = tokens.GetRange(0, end);
@@ -53,13 +53,13 @@ namespace PxPre.SynthSyn
             List<Token> inner = this.declPhrase.GetRange(bodyStart + 1, this.declPhrase.Count - bodyStart - 2);
             int line = inner[0].line;
 
-            SynthFuncDecl decl = 
-                SynthFuncDecl.Parse(
+            SynFuncDecl decl = 
+                SynFuncDecl.Parse(
                     this, 
                     inner, 
                     null, 
                     false, 
-                    SynthFuncDecl.ParseType.Region|SynthFuncDecl.ParseType.Externable);
+                    SynFuncDecl.ParseType.Region|SynFuncDecl.ParseType.Externable);
 
             if(decl == null)
                 throw new SynthExceptionSyntax(line, "Only entry and exit functions are allowed in regions.");
@@ -86,11 +86,11 @@ namespace PxPre.SynthSyn
 
         public override void Validate_AfterTypeAlignment(int logIndent)
         {
-            SynthLog.LogIndent(logIndent, $"Starting SynthRegion.Validate_AfterTypeAlignment : {this.name}");
+            SynLog.LogIndent(logIndent, $"Starting SynthRegion.Validate_AfterTypeAlignment : {this.name}");
 
             base.Validate_AfterTypeAlignment(logIndent + 1);
 
-            SynthLog.LogIndent(logIndent, "Ending SynthRegion.Validate_AfterTypeAlignment");
+            SynLog.LogIndent(logIndent, "Ending SynthRegion.Validate_AfterTypeAlignment");
         }
     }
 }

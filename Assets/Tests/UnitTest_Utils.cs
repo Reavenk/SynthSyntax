@@ -93,9 +93,9 @@ public static class UnitTest_Utils
         if(expected == null && expectedf == null)
             throw new System.Exception($"Test at {filepath} do not have expected answer keys to test against.");
 
-        using (var logScope = new SynthLog.LogScope())
+        using (var logScope = new SynLog.LogScope())
         {
-            SynthContext ctx = new SynthContext();
+            SynContext ctx = new SynContext();
             ctx.ParseFile(filepath);
             WASMBuild wasmBuild = new WASMBuild(ctx);
             byte[] wasmBin = wasmBuild.BuildWASM();

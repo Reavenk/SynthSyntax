@@ -4,11 +4,11 @@ using UnityEngine;
 
 namespace PxPre.SynthSyn
 {
-    public class SynthType_Intrinsic : SynType
+    public class SynIntrinsic : SynType
     {
         public int byteSize;
 
-        public SynthType_Intrinsic(SynthScope parent, string name, int byteSize)
+        public SynIntrinsic(SynScope parent, string name, int byteSize)
             : base(parent, name, true)
         { 
             this.byteSize = byteSize;

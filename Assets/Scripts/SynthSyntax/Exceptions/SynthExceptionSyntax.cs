@@ -9,19 +9,19 @@ namespace PxPre.SynthSyn
         public SynthExceptionSyntax()
             : base()
         {
-            SynthLog.Log("SYNTAXERROR!");
+            SynLog.Log("SYNTAXERROR!");
         }
 
         public SynthExceptionSyntax(int line, string why)
             : base(why)
         {
-            SynthLog.Log($"Syntax Error line {line}: " + why);
+            SynLog.Log($"Syntax Error line {line}: " + why);
         }
 
         public SynthExceptionSyntax(Token t, string why)
             : base($"Syntax Error line {t.line}: " + why)
         {
-            SynthLog.Log($"Syntax Error line {t.line}: " + why);
+            SynLog.Log($"Syntax Error line {t.line}: " + why);
         }
     }
 }

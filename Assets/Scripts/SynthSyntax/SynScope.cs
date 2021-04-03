@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace PxPre.SynthSyn
 {
-    public class SynthScope : SynthObj
+    public class SynScope : SynObj
     {
         /// <summary>
         /// The state of progress for a set of things being processed.
@@ -44,28 +44,28 @@ namespace PxPre.SynthSyn
             IgnoreReversible
         }
 
-        protected SynthScope parentScope;
+        protected SynScope parentScope;
 
         public List<Token> declPhrase = new List<Token>();
     
         protected Dictionary<string, SynType> typesDefs = new Dictionary<string, SynType>();
 
-        protected Dictionary<string, List<SynthFuncDecl>> functions = new Dictionary<string, List<SynthFuncDecl>>();
-        public IReadOnlyDictionary<string, List<SynthFuncDecl>> Functions {get{return this.functions; } }
+        protected Dictionary<string, List<SynFuncDecl>> functions = new Dictionary<string, List<SynFuncDecl>>();
+        public IReadOnlyDictionary<string, List<SynFuncDecl>> Functions {get{return this.functions; } }
 
         // Either local variables of a function, or member variables.
-        protected List<SynthVarValue> varDefs = new List<SynthVarValue>();
-        protected Dictionary<string, SynthVarValue> varLookups = new Dictionary<string, SynthVarValue>();
+        protected List<SynVarValue> varDefs = new List<SynVarValue>();
+        protected Dictionary<string, SynVarValue> varLookups = new Dictionary<string, SynVarValue>();
 
         // Static/Global values
-        protected List<SynthVarValue> globalDefs = new List<SynthVarValue>();
-        protected Dictionary<string, SynthVarValue> globalLookups = new Dictionary<string, SynthVarValue>();
+        protected List<SynVarValue> globalDefs = new List<SynVarValue>();
+        protected Dictionary<string, SynVarValue> globalLookups = new Dictionary<string, SynVarValue>();
 
-        protected Dictionary<string, SynthRegion> regions = new Dictionary<string, SynthRegion>();
+        protected Dictionary<string, SynRegion> regions = new Dictionary<string, SynRegion>();
 
         public int memoryStackSize = -1;
 
-        public SynthScope(SynthScope parent)
+        public SynScope(SynScope parent)
         { 
             this.parentScope = parent;
         }
@@ -90,15 +90,15 @@ namespace PxPre.SynthSyn
             return null;
         }
 
-        public SynthFuncDecl ExtracFunctionDecl(List<Token> tokens, int start, ref int end)
+        public SynFuncDecl ExtracFunctionDecl(List<Token> tokens, int start, ref int end)
         {
             // TODO: Remove?
             return null;
         }
 
-        public virtual SynthVarValue GetVar(string name, bool recursion = true)
+        public virtual SynVarValue GetVar(string name, bool recursion = true)
         { 
-            SynthVarValue ret;
+            SynVarValue ret;
             if(this.varLookups.TryGetValue(name, out ret) == true)
                 return ret;
 
@@ -120,9 +120,9 @@ namespace PxPre.SynthSyn
             return null;
         }
 
-        public List<SynthFuncDecl> GetFunction(string functionName, bool recursion = true)
+        public List<SynFuncDecl> GetFunction(string functionName, bool recursion = true)
         { 
-            List<SynthFuncDecl> ret;
+            List<SynFuncDecl> ret;
             if(this.functions.TryGetValue(functionName, out ret) == true)
                 return ret;
 
@@ -162,47 +162,47 @@ namespace PxPre.SynthSyn
 
         }
 
-        public void AddVariable(SynthVarValue var)
+        public void AddVariable(SynVarValue var)
         {
-            if(var.varLoc == SynthVarValue.VarLocation.Static)
+            if(var.varLoc == SynVarValue.VarLocation.Static)
                 this.AddGlobalVar(var);
             else
                 this.AddLocalVariable(var);
         }
 
-        public SynthVarValue AddLocalVariable(string varName, SynType ty)
+        public SynVarValue AddLocalVariable(string varName, SynType ty)
         {
-            return this.AddVariable(varName, ty, VarDst.Local, SynthVarValue.VarLocation.Local);
+            return this.AddVariable(varName, ty, VarDst.Local, SynVarValue.VarLocation.Local);
         }
 
-        public SynthVarValue AddLocalVariable(string varName, string tyName)
+        public SynVarValue AddLocalVariable(string varName, string tyName)
         {
-            return this.AddVariable(varName, tyName, VarDst.Local, SynthVarValue.VarLocation.Local);
+            return this.AddVariable(varName, tyName, VarDst.Local, SynVarValue.VarLocation.Local);
         }
 
-        public void AddLocalVariable(SynthVarValue var)
+        public void AddLocalVariable(SynVarValue var)
         {
             this.AddVariable(var, VarDst.Local);
         }
 
-        public SynthVarValue AddGlobalVar(string varName, SynType ty)
+        public SynVarValue AddGlobalVar(string varName, SynType ty)
         {
-            return this.AddVariable(varName, ty, VarDst.Global, SynthVarValue.VarLocation.Static);
+            return this.AddVariable(varName, ty, VarDst.Global, SynVarValue.VarLocation.Static);
         }
 
-        public SynthVarValue AddGlobalVar(string varName, string tyName)
+        public SynVarValue AddGlobalVar(string varName, string tyName)
         {
-            return this.AddVariable(varName, tyName, VarDst.Global, SynthVarValue.VarLocation.Static);
+            return this.AddVariable(varName, tyName, VarDst.Global, SynVarValue.VarLocation.Static);
         }
 
-        public void AddGlobalVar(SynthVarValue var)
+        public void AddGlobalVar(SynVarValue var)
         { 
             this.AddVariable(var, VarDst.Global);
         }
 
-        public SynthVarValue AddVariable(string varName, SynType ty, VarDst dst, SynthVarValue.VarLocation varLoc)
+        public SynVarValue AddVariable(string varName, SynType ty, VarDst dst, SynVarValue.VarLocation varLoc)
         {
-            SynthVarValue newVar = new SynthVarValue();
+            SynVarValue newVar = new SynVarValue();
             newVar.varLoc = varLoc;
             newVar.varName = varName;
             newVar.typeName = ty.typeName;
@@ -212,9 +212,9 @@ namespace PxPre.SynthSyn
             return newVar;
         }
 
-        public SynthVarValue AddVariable(string varName, string tyName, VarDst dst, SynthVarValue.VarLocation varLoc)
+        public SynVarValue AddVariable(string varName, string tyName, VarDst dst, SynVarValue.VarLocation varLoc)
         {
-            SynthVarValue newVar = new SynthVarValue();
+            SynVarValue newVar = new SynVarValue();
             newVar.varLoc = varLoc;
             newVar.varName = varName;
             newVar.typeName = tyName;
@@ -223,7 +223,7 @@ namespace PxPre.SynthSyn
             return newVar;
         }
 
-        public void AddVariable(SynthVarValue var, VarDst dst)
+        public void AddVariable(SynVarValue var, VarDst dst)
         {
             if(dst == VarDst.Global)
             {
@@ -239,19 +239,19 @@ namespace PxPre.SynthSyn
                 throw new SynthExceptionImpossible("Attemping to add variable to unknown destination");
         }
 
-        public void AddFunction(SynthFuncDecl fnAdding)
+        public void AddFunction(SynFuncDecl fnAdding)
         {
-            List<SynthFuncDecl> fns;
+            List<SynFuncDecl> fns;
             if(this.functions.TryGetValue(fnAdding.functionName, out fns) == false)
             { 
-                fns = new List<SynthFuncDecl>();
+                fns = new List<SynFuncDecl>();
                 this.functions.Add(fnAdding.functionName, fns);
             }
             else 
             { 
                 if(fnAdding.isDestructor == true)
                 { 
-                    foreach(SynthFuncDecl already in fns)
+                    foreach(SynFuncDecl already in fns)
                     { 
                         if(already.isDestructor == true)
                             throw new SynthExceptionSyntax(fnAdding.declPhrase[0], "Attempting to declare multiple destructors.");
@@ -260,7 +260,7 @@ namespace PxPre.SynthSyn
                 else
                 {
                     // Check if there's a signature collision with function overloads
-                    foreach(SynthFuncDecl already in fns)
+                    foreach(SynFuncDecl already in fns)
                     { 
                         if(already.parameterSet.ExactlyMatches(fnAdding.parameterSet) == true)
                                 throw new System.Exception($"Function declaration {fnAdding.functionName} already included");
@@ -283,7 +283,7 @@ namespace PxPre.SynthSyn
         /// known have been aligned.
         /// </summary>
         /// <param name="globalsRegistry">The registry to add globals to</param>
-        public virtual void RegisterGlobals(List<SynthVarValue> globalsRegistry)
+        public virtual void RegisterGlobals(List<SynVarValue> globalsRegistry)
         { 
             globalsRegistry.AddRange(this.globalDefs);
         }
@@ -294,15 +294,15 @@ namespace PxPre.SynthSyn
         /// </summary>
         public virtual void Validate_AfterTypeAlignment(int logIndent)
         {
-            SynthLog.LogIndent(logIndent, "Started base.Validate_AfterTypeAlignment");
+            SynLog.LogIndent(logIndent, "Started base.Validate_AfterTypeAlignment");
 
-            foreach (SynthScope ss in this.EnumerateScopes())
+            foreach (SynScope ss in this.EnumerateScopes())
                 ss.Validate_AfterTypeAlignment(logIndent + 1);
 
-            SynthLog.LogIndent(logIndent, "Ended base.Validate_AfterTypeAlignment");
+            SynLog.LogIndent(logIndent, "Ended base.Validate_AfterTypeAlignment");
         }
 
-        public virtual IEnumerable<SynthScope> EnumerateScopes()
+        public virtual IEnumerable<SynScope> EnumerateScopes()
         {
             foreach( var v in this.typesDefs)
                 yield return v.Value;
@@ -317,7 +317,7 @@ namespace PxPre.SynthSyn
                 yield return v.Value;
         }
 
-        public IEnumerable<SynthFuncDecl> EnumerateScopedFunctions()
+        public IEnumerable<SynFuncDecl> EnumerateScopedFunctions()
         { 
             foreach(var v in this.functions)
             { 
@@ -326,7 +326,7 @@ namespace PxPre.SynthSyn
             }
         }
 
-        public virtual SynthContext GetRootContext()
+        public virtual SynContext GetRootContext()
         { 
             if(this.parentScope == null)
                 return null;
@@ -341,15 +341,15 @@ namespace PxPre.SynthSyn
         /// <param name="otherType"></param>
         /// <param name="reversible">If true, only reversible functions are </param>
         /// <returns></returns>
-        public SynthFuncDecl GetOperator(string opName, SynType otherType, OperatorReversing revMode)
+        public SynFuncDecl GetOperator(string opName, SynType otherType, OperatorReversing revMode)
         { 
             string fullName = "operator" + opName;
 
-            List<SynthFuncDecl> fns;
+            List<SynFuncDecl> fns;
             if(this.functions.TryGetValue(fullName, out fns) == false)
                 return null;
 
-            foreach(SynthFuncDecl sfc in fns)
+            foreach(SynFuncDecl sfc in fns)
             { 
                 if(sfc.parameterSet.Count != 1 || sfc.isStatic == true)
                     continue;
@@ -389,28 +389,28 @@ namespace PxPre.SynthSyn
                 v.Value.GatherFunctionRegistration(builds);
         }
 
-        public SynthCanidateFunctions GetCanidateFunctions(string functionName)
+        public SynCanidateFuncs GetCanidateFunctions(string functionName)
         {
-            SynthCanidateFunctions canFns = new SynthCanidateFunctions(this);
+            SynCanidateFuncs canFns = new SynCanidateFuncs(this);
             this.FillFunctionList(functionName, this, canFns.functions);
             return canFns;
         }
 
-        public List<SynthFuncDecl> GetFunctionList(string functionName, SynthScope scope)
+        public List<SynFuncDecl> GetFunctionList(string functionName, SynScope scope)
         {
-            List<SynthFuncDecl> ret = new List<SynthFuncDecl>();
+            List<SynFuncDecl> ret = new List<SynFuncDecl>();
             this.FillFunctionList(functionName, scope, ret);
             return ret;
         }
 
-        protected void FillFunctionList(string functionName, SynthScope scope, List<SynthFuncDecl> lst)
+        protected void FillFunctionList(string functionName, SynScope scope, List<SynFuncDecl> lst)
         {
             foreach (var v in this.functions)
             {
                 if(v.Key != functionName)
                     continue;
 
-                foreach(SynthFuncDecl sfn in v.Value)
+                foreach(SynFuncDecl sfn in v.Value)
                 {
                     if (sfn.functionName != functionName)
                         continue;

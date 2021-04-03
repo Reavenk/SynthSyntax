@@ -4,12 +4,12 @@ using UnityEngine;
 
 namespace PxPre.SynthSyn
 {
-    public class SynthParsedObj
+    public class SynParsedObj
     {
-        public readonly SynthScope parentScope;
+        public readonly SynScope parentScope;
         public List<Token> declPhrase = new List<Token>();
 
-        public SynthParsedObj(SynthScope parentScope)
+        public SynParsedObj(SynScope parentScope)
         { 
             this.parentScope = parentScope;
         }

@@ -49,7 +49,7 @@
     /// These values can exists in several forms and locations, represented by the
     /// ValueLoc enum.
     /// </summary>
-    public class ValueRef : SynthObj
+    public class ValueRef : SynObj
     {
         public ValueLoc valLoc;
 

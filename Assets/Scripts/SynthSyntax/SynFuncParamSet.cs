@@ -3,13 +3,13 @@
 namespace PxPre.SynthSyn
 {
     /// <summary>
-    /// Utility function to manage the parameters from a SynthFuncDecl.
+    /// Utility function to manage the parameters from a SynFuncDecl.
     /// </summary>
-    public class SynthFuncParamSet
+    public class SynFuncParamSet
     {
-        public List<SynthVarValue> paramList = new List<SynthVarValue>();
+        public List<SynVarValue> paramList = new List<SynVarValue>();
         public List<ValueRef> paramRefs = new List<ValueRef>();
-        public Dictionary<string, SynthVarValue> paramLookup = new Dictionary<string, SynthVarValue>();
+        public Dictionary<string, SynVarValue> paramLookup = new Dictionary<string, SynVarValue>();
 
         public int Count { get => this.paramList.Count; }
 
@@ -27,35 +27,35 @@ namespace PxPre.SynthSyn
             if(this.paramList.Count != 0)
                 throw new SynthExceptionImpossible("Cannot add 'this' parameter to a function that already has parameters.");
 
-            SynthVarValue svvThis = new SynthVarValue();
+            SynVarValue svvThis = new SynVarValue();
             svvThis.type = styThis;
             svvThis.typeName = styThis.typeName;
             svvThis.varName = "this";
-            svvThis.varLoc = SynthVarValue.VarLocation.ThisRef;
+            svvThis.varLoc = SynVarValue.VarLocation.ThisRef;
 
             this.AddParameter(svvThis);
         }
 
-        public void AddParameter(SynthVarValue svvParam)
+        public void AddParameter(SynVarValue svvParam)
         {
             this.paramList.Add(svvParam);
             this.paramLookup.Add(svvParam.varName, svvParam);
             
-            if(svvParam.varLoc == SynthVarValue.VarLocation.ThisRef)
+            if(svvParam.varLoc == SynVarValue.VarLocation.ThisRef)
             { 
                 if(this.paramList.Count != 1)
                     throw new SynthExceptionImpossible("'this' parameter added in an illegal location.");
             }
         }
 
-        public void _Validate(SynthFuncDecl sfd)
+        public void _Validate(SynFuncDecl sfd)
         {
             if(sfd.isStatic == false)
             { 
                 if(
                     this.paramList.Count == 0 || 
                     this.paramList[0].varName != "this" ||
-                    this.paramList[0].varLoc != SynthVarValue.VarLocation.ThisRef)
+                    this.paramList[0].varLoc != SynVarValue.VarLocation.ThisRef)
                 { 
                     throw new SynthExceptionImpossible($"Member function {sfd.functionName} does not have a proper 'this' as the first parameter.");
                 }
@@ -67,19 +67,19 @@ namespace PxPre.SynthSyn
             // this.paramRefs.Count isn't generated yet.
         }
 
-        public SynthVarValue Get(string name)
+        public SynVarValue Get(string name)
         {
-            SynthVarValue svv;
+            SynVarValue svv;
             this.paramLookup.TryGetValue(name, out svv);
             return svv;
         }
 
-        public SynthVarValue Get(int idx)
+        public SynVarValue Get(int idx)
         { 
             return this.paramList[idx];
         }
 
-        public ValueRef GetRef(SynthVarValue svv)
+        public ValueRef GetRef(SynVarValue svv)
         {
             for (int i = 0; i < this.paramList.Count; ++i)
             {
@@ -94,7 +94,7 @@ namespace PxPre.SynthSyn
             return this.paramRefs[idx];
         }
 
-        public bool ExactlyMatches(IReadOnlyList<SynthVarValue> cmpAgainst, bool ignoreFirst)
+        public bool ExactlyMatches(IReadOnlyList<SynVarValue> cmpAgainst, bool ignoreFirst)
         {
             if(ignoreFirst == true)
             {
@@ -122,12 +122,12 @@ namespace PxPre.SynthSyn
             return true;
         }
 
-        public bool ExactlyMatches(SynthFuncParamSet otherParams)
+        public bool ExactlyMatches(SynFuncParamSet otherParams)
         { 
             return this.ExactlyMatches(otherParams.paramList, false);
         }
 
-        public void PostTypeAlignment(SynthFuncDecl sty)
+        public void PostTypeAlignment(SynFuncDecl sty)
         {
             if(this.totalMemStackBytes != 0 )
                 throw new SynthExceptionImpossible("Calculating total memstack size, but the counter has already been touched.");
@@ -138,9 +138,9 @@ namespace PxPre.SynthSyn
             // Fill up this.paramRefs
             for (int i = 0; i < this.paramList.Count; ++i)
             {
-                SynthVarValue svvParam = this.paramList[i];
+                SynVarValue svvParam = this.paramList[i];
 
-                if (svvParam.varLoc == SynthVarValue.VarLocation.ThisRef)
+                if (svvParam.varLoc == SynVarValue.VarLocation.ThisRef)
                 {
                     if (i != 0)
                         throw new SynthExceptionImpossible("'this' parameter added in an illegal location.");
@@ -151,7 +151,7 @@ namespace PxPre.SynthSyn
                     this.paramRefs.Add(vr);
                     ++this.totalLocalIndices;
                 }
-                else if (svvParam.varLoc != SynthVarValue.VarLocation.Parameter)
+                else if (svvParam.varLoc != SynVarValue.VarLocation.Parameter)
                     throw new SynthExceptionImpossible("Parameter variable that was attempted to be added wasn't constructed as a parameter.");
                 else if (svvParam.type.intrinsic == true)
                 {
@@ -177,7 +177,7 @@ namespace PxPre.SynthSyn
 
             // Validation of default parameters.
             bool startedDefaultSection = false;
-            foreach (SynthVarValue svv in this.paramList)
+            foreach (SynVarValue svv in this.paramList)
             {
                 if (svv.varName == "this")
                     continue;
@@ -208,7 +208,7 @@ namespace PxPre.SynthSyn
         {
             return 
                 this.paramList.Count >= 1 && 
-                this.paramList[0].varLoc == SynthVarValue.VarLocation.ThisRef;
+                this.paramList[0].varLoc == SynVarValue.VarLocation.ThisRef;
         }
     }
 }

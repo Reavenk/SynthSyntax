@@ -4,8 +4,7 @@ using UnityEngine;
 
 namespace PxPre.SynthSyn
 {
-    // TODO: Rename to SynthNestScopeBuilder?
-    public class SynthContextBuilder : SynthObj
+    public class SynNestingBuilder : SynObj
     {
         public struct OperatorInfo
         {
@@ -93,15 +92,15 @@ namespace PxPre.SynthSyn
                 new OperatorInfo("/",   ASTOp.Div),
                 new OperatorInfo("%",   ASTOp.Mod)};
 
-        public readonly SynthContextBuilder parent;
+        public readonly SynNestingBuilder parent;
 
-        public SynthContextBuilder(SynthContextBuilder parent)
+        public SynNestingBuilder(SynNestingBuilder parent)
         { 
             this.parent = parent;
         }
 
 
-        AST ProcessLogic(SynthScope scope, TokenTree tt)
+        AST ProcessLogic(SynScope scope, TokenTree tt)
         { 
             AST ast = ProcessMathTree(scope, tt);
             if(ast != null)
@@ -188,7 +187,7 @@ namespace PxPre.SynthSyn
         /// alignment off the function parameters.
         /// </summary>
         /// <param name="fnBase"></param>
-        public void CompileAlignment(SynthFuncDecl fnBase)
+        public void CompileAlignment(SynFuncDecl fnBase)
         {
             this.CompileAlignment(
                 fnBase.parameterSet.TotalLocalIndices, 
@@ -215,7 +214,7 @@ namespace PxPre.SynthSyn
             this.totalMemoryStackBytes += memBase;
         }
 
-        AST ProcessMathTree(SynthScope scope, TokenTree tt)
+        AST ProcessMathTree(SynScope scope, TokenTree tt)
         {
             // TODO: Is this a duplicate of ProcessMathOperators()?
 
@@ -253,7 +252,7 @@ namespace PxPre.SynthSyn
 
         
 
-        AST ProcessComparison(SynthScope scope, TokenTree tt)
+        AST ProcessComparison(SynScope scope, TokenTree tt)
         {
             foreach(OperatorInfo oi in OperatorsCmp)
             {
@@ -289,7 +288,7 @@ namespace PxPre.SynthSyn
 
         
 
-        AST ProcessBitOperators(SynthScope scope, TokenTree tt)
+        AST ProcessBitOperators(SynScope scope, TokenTree tt)
         {
             foreach (OperatorInfo oi in OperatorsBitWise)
             {
@@ -323,7 +322,7 @@ namespace PxPre.SynthSyn
             return null;
         }
 
-        AST ProcessMathOperators(SynthScope scope, TokenTree tt)
+        AST ProcessMathOperators(SynScope scope, TokenTree tt)
         {
             foreach (OperatorInfo oi in OperatorsBitWise)
             {
@@ -362,7 +361,7 @@ namespace PxPre.SynthSyn
         /// <param name="scope"></param>
         /// <param name="tt"></param>
         /// <returns></returns>
-        AST ProcessIntrinsic(SynthScope scope, TokenTree tt)
+        AST ProcessIntrinsic(SynScope scope, TokenTree tt)
         {
             // TODO: Is this function redundant compared to ProcessFunctionExpression()?
             // Check if this should be removed.
@@ -396,11 +395,11 @@ namespace PxPre.SynthSyn
         public AST GenerateOperatorAST(string operatorName, Token tokOp, AST left, AST right)
         {
             // First check non-reversible entries.
-            SynthFuncDecl sfd = 
+            SynFuncDecl sfd = 
                 left.evaluatingType.GetOperator(
                     operatorName, 
                     right.evaluatingType, 
-                    SynthScope.OperatorReversing.OnlyNonReversible);
+                    SynScope.OperatorReversing.OnlyNonReversible);
 
             if (sfd != null)
             {
@@ -437,7 +436,7 @@ namespace PxPre.SynthSyn
             }
 
             // If we couldn't find a working operator, try looking for reversible ones.
-            sfd = left.evaluatingType.GetOperator(operatorName, left.evaluatingType, SynthScope.OperatorReversing.OnlyReversible);
+            sfd = left.evaluatingType.GetOperator(operatorName, left.evaluatingType, SynScope.OperatorReversing.OnlyReversible);
             if (sfd != null)
             {
                 return new AST(
@@ -470,16 +469,16 @@ namespace PxPre.SynthSyn
         /// will be thrown. It is expected in the future for nulls to never be thrown, and any error
         /// or null result to end with a throw.</remarks>
         public AST ProcessFunctionExpression(
-            List<SynthContextBuilder> regCtxBuilders,
+            List<SynNestingBuilder> regCtxBuilders,
             WASMBuild build, 
-            SynthScope invokingContext, 
-            SynthFuncDecl function, 
+            SynScope invokingContext, 
+            SynFuncDecl function, 
             TokenTree node)
         {
             // We may formalize this later instead of piggybacking off the fact
             // that the function has fallback access to the base scope where
             // instrinsics are defined.
-            SynthScope intrinsicSource = function;
+            SynScope intrinsicSource = function;
 
             if(node.root.Matches(TokenType.tyBool) == true)
             {
@@ -540,7 +539,7 @@ namespace PxPre.SynthSyn
                 if(node.nodes[1].root.Matches(TokenType.tyWord) == false || node.nodes[1].nodes.Count != 0)
                     throw new SynthExceptionSyntax(node.nodes[1].root, "Invalid dereference type.");
 
-                SynthVarValue svv = astSrc.evaluatingType.GetVar(node.nodes[1].root.fragment);
+                SynVarValue svv = astSrc.evaluatingType.GetVar(node.nodes[1].root.fragment);
 
                 if(svv != null)
                 {
@@ -570,7 +569,7 @@ namespace PxPre.SynthSyn
                 // method call
                 if(node.nodes[1].root.Matches(TokenType.tyWord) && node.nodes[1].nodes.Count == 0)
                 {
-                    SynthCanidateFunctions scf = astSrc.evaluatingType.GetCanidateFunctions(node.nodes[1].root.fragment);
+                    SynCanidateFuncs scf = astSrc.evaluatingType.GetCanidateFunctions(node.nodes[1].root.fragment);
                     AST astPropose = new AST(node.nodes[1].root, this, ASTOp.ProposeMethod, scf, null, false, AST.DataManifest.NoData, astSrc);
                     return astPropose;
                 }
@@ -655,6 +654,13 @@ namespace PxPre.SynthSyn
 
                     AST astVarName = 
                         new AST(node.nodes[0].root, this, ASTOp.RegisterLocalVarName, null, null, false, AST.DataManifest.NoData);
+
+                    //int pointerLvl = 0;
+                    //foreach(Token t_ttp in node.toksToProcess)
+                    //{ 
+                    //    if(t_ttp.MatchesSymbol("@") == true)
+                    //        ++pointerLvl;
+                    //}
                     
                     astDeclVar.branches.Add(astVarName);
                     if(node.nodes.Count > 1)
@@ -688,24 +694,24 @@ namespace PxPre.SynthSyn
                 if(localVR != null)
                     return new AST(node.root, this, ASTOp.GetLocalVar, localVR, localVR.varType, true, AST.DataManifest.Procedural);
 
-                SynthVarValue svv = function.GetVar(node.root.fragment);
+                SynVarValue svv = function.GetVar(node.root.fragment);
                 if(svv != null)
                 {
-                    if(svv.varLoc == SynthVarValue.VarLocation.Member)
+                    if(svv.varLoc == SynVarValue.VarLocation.Member)
                     {
                         AST astSrc = new AST(node.root, this, ASTOp.GetThis, function.GetStructScope(), function.GetStructScope(), false, AST.DataManifest.Procedural);
                         AST astDeref = new AST(node.root, this, ASTOp.DerefName, null, svv.type, false, AST.DataManifest.Procedural);
                         return new AST(node.root, this, ASTOp.GetMemberVar, svv, svv.type, true, AST.DataManifest.Procedural, astSrc, astDeref);
                     }
-                    else if(svv.varLoc == SynthVarValue.VarLocation.Parameter)
+                    else if(svv.varLoc == SynVarValue.VarLocation.Parameter)
                     {
                         return new AST(node.root, this, ASTOp.GetParamVar, svv, svv.type, true, AST.DataManifest.Procedural);
                     }
-                    else if(svv.varLoc == SynthVarValue.VarLocation.Local)
+                    else if(svv.varLoc == SynVarValue.VarLocation.Local)
                     {
                         return new AST(node.root, this, ASTOp.GetLocalVar, svv, svv.type, true, AST.DataManifest.Procedural);
                     }
-                    else if(svv.varLoc == SynthVarValue.VarLocation.Static)
+                    else if(svv.varLoc == SynVarValue.VarLocation.Static)
                     {
                         return new AST(node.root, this, ASTOp.GetGlobalVar, svv, svv.type, true, AST.DataManifest.Procedural);
                     }
@@ -734,7 +740,7 @@ namespace PxPre.SynthSyn
                     
                 }
 
-                SynthCanidateFunctions canFns = function.GetCanidateFunctions(node.root.fragment);
+                SynCanidateFuncs canFns = function.GetCanidateFunctions(node.root.fragment);
                 if(canFns == null || canFns.functions.Count > 0)
                     return new AST(node.root, this, ASTOp.GetFunction, canFns, null, false, AST.DataManifest.NoData);
 
@@ -870,7 +876,7 @@ namespace PxPre.SynthSyn
 
                         // Similar (duplicate) of what's found in this.ProcessFunctionExpression - but done
                         // under a different context.
-                        SynthCanidateFunctions canFns = function.GetCanidateFunctions(fragName);
+                        SynCanidateFuncs canFns = function.GetCanidateFunctions(fragName);
                         if (canFns == null || canFns.functions.Count > 0)
                             caller = new AST(node.root, this, ASTOp.GetFunction, canFns, null, false, AST.DataManifest.NoData);
                         else
@@ -880,7 +886,7 @@ namespace PxPre.SynthSyn
                             SynType styFrag = function.GetType(fragName);
                             if(styFrag != null)
                             { 
-                                SynthCanidateFunctions consFns = styFrag.GetCanidateFunctions(fragName);
+                                SynCanidateFuncs consFns = styFrag.GetCanidateFunctions(fragName);
                                 if(consFns == null || consFns.functions.Count > 0)
                                     caller = new AST(node.root, this, ASTOp.Construct, consFns, styFrag, false, AST.DataManifest.NoData);
                             }
@@ -892,14 +898,14 @@ namespace PxPre.SynthSyn
                         caller = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[1]);
                     }
 
-                    SynthCanidateFunctions cfns = caller.synthObj.CastCanidateFunctions();
+                    SynCanidateFuncs cfns = caller.synthObj.CastCanidateFunctions();
                     if(cfns == null)
                         throw new SynthExceptionSyntax(node.nodes[1].root, "Could not evaluate function");
 
                     // We received a list of possible function overloads, now we find the appropriate one.
                     // For now we're going to be super-naive and just go off of parameter count.
-                    List<SynthFuncDecl> matchingFns = new List<SynthFuncDecl>();
-                    foreach(SynthFuncDecl sfn in cfns.functions)
+                    List<SynFuncDecl> matchingFns = new List<SynFuncDecl>();
+                    foreach(SynFuncDecl sfn in cfns.functions)
                     { 
                         if(sfn.GetInputParameters() != paramNum)
                             continue;
@@ -911,7 +917,7 @@ namespace PxPre.SynthSyn
                         throw new SynthExceptionSyntax(node.nodes[1].root, $"Could not find a proper overloaded function.");
 
                     // The function that has been resolved as the one for use.
-                    SynthFuncDecl reslvFn = matchingFns[0];
+                    SynFuncDecl reslvFn = matchingFns[0];
 
                     int startParamIdx = reslvFn.isStatic ? 0 : 1;
                     for (int i = startParamIdx, j = 0; i < reslvFn.parameterSet.Count; ++i, ++j)
@@ -1185,10 +1191,10 @@ namespace PxPre.SynthSyn
         }
 
         public void EnsureLeftAndRightCompatibility(
-            List<SynthContextBuilder> regCtxBuilders, 
+            List<SynNestingBuilder> regCtxBuilders, 
             WASMBuild build, 
-            SynthScope invokingContext, 
-            SynthFuncDecl fnDecl, 
+            SynScope invokingContext, 
+            SynFuncDecl fnDecl, 
             TokenTree tt, 
             out AST left, 
             out AST right, 
@@ -1449,11 +1455,11 @@ namespace PxPre.SynthSyn
 
         
 
-        public void ProcessDefaultVarTokens(SynthVarValue fnParam, List<TokenTree> trees)
+        public void ProcessDefaultVarTokens(SynVarValue fnParam, List<TokenTree> trees)
         { 
         }
 
-        public void BuildBSFunction( SynthFuncDecl fnd, AST ast, WASMBuild wasmBuild, SynthContextBuilder ctxBuilder, WASMByteBuilder fnBuild)
+        public void BuildBSFunction( SynFuncDecl fnd, AST ast, WASMBuild wasmBuild, SynNestingBuilder ctxBuilder, WASMByteBuilder fnBuild)
         { 
 
             foreach(AST n in ast.branches)
@@ -1464,7 +1470,7 @@ namespace PxPre.SynthSyn
 
         static HashSet<string> match32 = new HashSet<string> { "int8", "uint8", "int16", "uint16", "int", "uint" };
         static HashSet<string> match64 = new HashSet<string> { "int64", "uint64" };
-        public ValueRef BuildBSFunctionExpression(SynthFuncDecl fnd, AST expr, WASMBuild wasmBuild, SynthContextBuilder ctxBuilder, WASMByteBuilder fnBuild)
+        public ValueRef BuildBSFunctionExpression(SynFuncDecl fnd, AST expr, WASMBuild wasmBuild, SynNestingBuilder ctxBuilder, WASMByteBuilder fnBuild)
         { 
             switch(expr.astType)
             {
@@ -1551,7 +1557,7 @@ namespace PxPre.SynthSyn
                         // Get the member variable (pointer to it)
                         if(vr.valLoc != ValueLoc.ValueOnMemStack)
                         { 
-                            SynthVarValue svv = vr.varType.GetVar(expr.branches[1].token.fragment, false);
+                            SynVarValue svv = vr.varType.GetVar(expr.branches[1].token.fragment, false);
                             if(svv == null)
                                 throw new SynthExceptionSyntax(expr.branches[0].token, "Dereferenced member doesn't exist.");
 
@@ -1588,7 +1594,7 @@ namespace PxPre.SynthSyn
 
                 case ASTOp.GetParamVar:
                     { 
-                        SynthVarValue svvParam = fnd.GetParameter(expr.token.fragment);
+                        SynVarValue svvParam = fnd.GetParameter(expr.token.fragment);
                         if(svvParam == null)
                             throw new SynthExceptionImpossible("Could not find expected parameter.");
 
@@ -2131,7 +2137,7 @@ namespace PxPre.SynthSyn
 
                                 vrReg.PutLocalVarAddressOnStack(fnBuild);
 
-                                SynthFuncDecl sfdConstr = expr.branches[1].synthObj.CastFuncDecl();
+                                SynFuncDecl sfdConstr = expr.branches[1].synthObj.CastFuncDecl();
                                 BuildBSFunctionInvoke(sfdConstr, fnd, expr.branches[1], wasmBuild, ctxBuilder, fnBuild);
                             }
                             else
@@ -2175,7 +2181,7 @@ namespace PxPre.SynthSyn
                         }
                         else if(vrReg.varType.intrinsic == false)
                         { 
-                            SynthFuncDecl sfDefcon = vrReg.varType.GetDefaultConstructor();
+                            SynFuncDecl sfDefcon = vrReg.varType.GetDefaultConstructor();
 
                             if(sfDefcon != null)
                             {
@@ -2313,7 +2319,7 @@ namespace PxPre.SynthSyn
 
                 case ASTOp.CallMember:
                     { 
-                        SynthFuncDecl fnInvoke = expr.synthObj.CastFuncDecl();
+                        SynFuncDecl fnInvoke = expr.synthObj.CastFuncDecl();
                         if(fnInvoke == null)
                             throw new SynthExceptionImpossible("Missing function for method AST processing.");
 
@@ -2333,7 +2339,7 @@ namespace PxPre.SynthSyn
                         if(expr.synthObj == null)
                             throw new SynthExceptionImpossible("Missing function for global AST processing.");
 
-                        SynthFuncDecl fnInvoke = expr.synthObj.CastFuncDecl();
+                        SynFuncDecl fnInvoke = expr.synthObj.CastFuncDecl();
                         if(fnInvoke == null)
                             throw new SynthExceptionImpossible("Missing function for global AST processing.");
 
@@ -2392,7 +2398,7 @@ namespace PxPre.SynthSyn
 
                 case ASTOp.EndScope:
                     { 
-                        SynthContextBuilder ctxNest = expr.synthObj.CastNest();
+                        SynNestingBuilder ctxNest = expr.synthObj.CastNest();
                         if(ctxNest == null)
                             throw new SynthExceptionImpossible("Attempting to close the scope of a null nest.");
 
@@ -2402,7 +2408,7 @@ namespace PxPre.SynthSyn
                             if(vrToDestr.varType.intrinsic == true)
                                 continue;
 
-                            SynthFuncDecl fnDestr = vrToDestr.varType.GetDestructor();
+                            SynFuncDecl fnDestr = vrToDestr.varType.GetDestructor();
                             if(fnDestr == null)
                                 continue;
 
@@ -2647,11 +2653,11 @@ namespace PxPre.SynthSyn
         /// <param name="fnBuild">The WASM binary being generated.</param>
         /// <returns>Information on the location of the return value.</returns>
         public ValueRef BuildBSFunctionInvoke(
-            SynthFuncDecl fnInvoke, 
-            SynthFuncDecl fnd, 
+            SynFuncDecl fnInvoke, 
+            SynFuncDecl fnd, 
             AST expr, 
             WASMBuild wasmBuild, 
-            SynthContextBuilder ctxBuilder, 
+            SynNestingBuilder ctxBuilder, 
             WASMByteBuilder fnBuild)
         { 
             for (int i = 0; i < expr.branches.Count; ++i)
@@ -2677,8 +2683,8 @@ namespace PxPre.SynthSyn
         /// <param name="fnBuild">The wasm binary being generated.</param>
         /// <returns>Information on the location of the return value.</returns>
         public ValueRef BuildBSFunctionDirectInvoke(
-            SynthFuncDecl fnInvoke,
-            SynthFuncDecl fnCallContext,
+            SynFuncDecl fnInvoke,
+            SynFuncDecl fnCallContext,
             WASMBuild wasmBuild,
             WASMByteBuilder fnBuild)
         {
@@ -2760,7 +2766,7 @@ namespace PxPre.SynthSyn
             //TODO:
         }
 
-        public override SynthContextBuilder CastNest() 
+        public override SynNestingBuilder CastNest() 
         { 
             return this; 
         }

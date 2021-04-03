@@ -85,12 +85,12 @@ namespace PxPre.SynthSyn
         }
 
         public bool hasAddress;
-        public SynthObj synthObj;
+        public SynObj synthObj;
         public SynType evaluatingType;
         public Token token;
         public ASTOp astType;
         public List<AST> branches;
-        public SynthContextBuilder builder;
+        public SynNestingBuilder builder;
         public DataManifest manifest;
 
         public void SetBranches(params AST [] tas)
@@ -99,7 +99,7 @@ namespace PxPre.SynthSyn
             this.branches.AddRange(tas);
         }
 
-        public AST(Token t, SynthContextBuilder builder, ASTOp ast, SynthObj so, SynType sevty, bool hasAddress, DataManifest manifest, params AST [] branches)
+        public AST(Token t, SynNestingBuilder builder, ASTOp ast, SynObj so, SynType sevty, bool hasAddress, DataManifest manifest, params AST [] branches)
         { 
             this.builder        = builder;
             this.synthObj       = so;

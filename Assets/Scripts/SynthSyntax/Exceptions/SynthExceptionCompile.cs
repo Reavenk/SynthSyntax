@@ -14,13 +14,13 @@ namespace PxPre.SynthSyn
         public SynthExceptionCompile()
             : base()
         { 
-            SynthLog.Log("COMPILE ERROR!");
+            SynLog.Log("COMPILE ERROR!");
         }
 
         public SynthExceptionCompile(string why)
             : base(why)
         {
-            SynthLog.Log("COMPILE!: " + why);
+            SynLog.Log("COMPILE!: " + why);
         }
     }
 }

@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace PxPre.SynthSyn
 {
-    public static class SynthLog
+    public static class SynLog
     { 
         public class LogScope : System.IDisposable
         { 

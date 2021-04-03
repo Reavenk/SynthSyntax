@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace PxPre.SynthSyn
 {
-    public class SynthContext : SynthScope
+    public class SynContext : SynScope
     {
         public enum Type
         { 
@@ -15,20 +15,20 @@ namespace PxPre.SynthSyn
 
         int totalGlobalBytes = -1;
 
-        public SynthContext()
+        public SynContext()
             : base(null)
         { 
-            this.RegisterType(new SynthType_Intrinsic(this, "bool",   1));
-            this.RegisterType(new SynthType_Intrinsic(this, "int",    4));
-            this.RegisterType(new SynthType_Intrinsic(this, "uint",   4));
-            this.RegisterType(new SynthType_Intrinsic(this, "int64",  8));
-            this.RegisterType(new SynthType_Intrinsic(this, "uint64", 8));
-            this.RegisterType(new SynthType_Intrinsic(this, "int8",   1));
-            this.RegisterType(new SynthType_Intrinsic(this, "uint8",  1));
-            this.RegisterType(new SynthType_Intrinsic(this, "int16",  2));
-            this.RegisterType(new SynthType_Intrinsic(this, "uint16", 2));
-            this.RegisterType(new SynthType_Intrinsic(this, "float",  4));
-            this.RegisterType(new SynthType_Intrinsic(this, "float64",8));
+            this.RegisterType(new SynIntrinsic(this, "bool",   1));
+            this.RegisterType(new SynIntrinsic(this, "int",    4));
+            this.RegisterType(new SynIntrinsic(this, "uint",   4));
+            this.RegisterType(new SynIntrinsic(this, "int64",  8));
+            this.RegisterType(new SynIntrinsic(this, "uint64", 8));
+            this.RegisterType(new SynIntrinsic(this, "int8",   1));
+            this.RegisterType(new SynIntrinsic(this, "uint8",  1));
+            this.RegisterType(new SynIntrinsic(this, "int16",  2));
+            this.RegisterType(new SynIntrinsic(this, "uint16", 2));
+            this.RegisterType(new SynIntrinsic(this, "float",  4));
+            this.RegisterType(new SynIntrinsic(this, "float64",8));
         }
 
         public void RegisterType(SynType sty)
@@ -41,16 +41,16 @@ namespace PxPre.SynthSyn
 
         public void ParseContext(List<Token> tokens)
         {
-            SynthLog.LogHeader("Starting Parse Content");
-            SynthLog.Log("\tTokens:");
-            SynthLog.Log(tokens);
+            SynLog.LogHeader("Starting Parse Content");
+            SynLog.Log("\tTokens:");
+            SynLog.Log(tokens);
 
             //      Get param globals first
             //
             //////////////////////////////////////////////////
             while (tokens.Count > 0)
             {
-                SynthVarValue parsedParam = SynthVarValue.ParseExposedParam(tokens);
+                SynVarValue parsedParam = SynVarValue.ParseExposedParam(tokens);
                 if(parsedParam == null)
                     break;
 
@@ -84,8 +84,8 @@ namespace PxPre.SynthSyn
                 // Function parsing
                 if(tokens[0].Matches(TokenType.tyWord, "entry") == true)
                 { 
-                    SynthFuncDecl sfd = SynthFuncDecl.Parse(this, tokens, "", true, SynthFuncDecl.ParseType.Entry);
-                    sfd.callType = SynthFuncDecl.CallType.Entry;
+                    SynFuncDecl sfd = SynFuncDecl.Parse(this, tokens, "", true, SynFuncDecl.ParseType.Entry);
+                    sfd.callType = SynFuncDecl.CallType.Entry;
 
                     if (sfd != null)
                     {
@@ -96,12 +96,12 @@ namespace PxPre.SynthSyn
                         throw new System.Exception("entry keyword not part of valid function.");
                 }
 
-                SynthFuncDecl synthFn = 
-                    SynthFuncDecl.Parse(
+                SynFuncDecl synthFn = 
+                    SynFuncDecl.Parse(
                         this, tokens, 
                         "", 
                         true, 
-                        SynthFuncDecl.ParseType.RootContext);
+                        SynFuncDecl.ParseType.RootContext);
 
                 if(synthFn != null)
                 { 
@@ -109,7 +109,7 @@ namespace PxPre.SynthSyn
                     continue;
                 }
 
-                SynthVarValue synthVar = SynthVarValue.ParseBodyVar(tokens, SynthVarValue.OuterScope.Global);
+                SynVarValue synthVar = SynVarValue.ParseBodyVar(tokens, SynVarValue.OuterScope.Global);
                 if(synthVar != null)
                 {
                     this.AddVariable(synthVar);
@@ -122,7 +122,7 @@ namespace PxPre.SynthSyn
             //      Verify Structs
             //
             //////////////////////////////////////////////////
-            SynthLog.LogHeader("Verifying types");
+            SynLog.LogHeader("Verifying types");
 
             while (true)
             { 
@@ -134,20 +134,20 @@ namespace PxPre.SynthSyn
                     break;
             }
 
-            SynthLog.Log("Finished verifying struct successfully.");
+            SynLog.Log("Finished verifying struct successfully.");
 
             //      Gathering globals
             //
             //////////////////////////////////////////////////
-            SynthLog.LogHeader("Gathering globals");
+            SynLog.LogHeader("Gathering globals");
 
-            List<SynthVarValue> globals = new List<SynthVarValue>();
+            List<SynVarValue> globals = new List<SynVarValue>();
 
-            foreach(SynthScope s in this.EnumerateScopes())
+            foreach(SynScope s in this.EnumerateScopes())
                 s.RegisterGlobals(globals);
 
             this.totalGlobalBytes = 0;
-            foreach(SynthVarValue svv in globals)
+            foreach(SynVarValue svv in globals)
             { 
                 svv.alignmentOffset = this.totalGlobalBytes;
 
@@ -155,24 +155,24 @@ namespace PxPre.SynthSyn
                 if(byteSz <= 0)
                     throw new SynthExceptionImpossible("Data type for global variable is zero in size.");
 
-                SynthLog.Log($"Added {svv.varName} to globals at offset {svv.alignmentOffset}");
+                SynLog.Log($"Added {svv.varName} to globals at offset {svv.alignmentOffset}");
 
                 this.totalGlobalBytes += byteSz;
             }
 
-            SynthLog.Log($"Total global variable space is {this.totalGlobalBytes}.");
+            SynLog.Log($"Total global variable space is {this.totalGlobalBytes}.");
 
             //      Verify Functions
             //
             //////////////////////////////////////////////////
-            SynthLog.LogHeader("Verifying After function and variable collection pass.");
+            SynLog.LogHeader("Verifying After function and variable collection pass.");
             this.Validate_AfterTypeAlignment(0);
 
-            SynthLog.Log("Finished verifying functions successfully.");
+            SynLog.Log("Finished verifying functions successfully.");
 
         }
 
-        SynthVarValue GetParamPhrase(List<Token> tokens)
+        SynVarValue GetParamPhrase(List<Token> tokens)
         { 
             int idx = 0;
             if(tokens[idx].Matches(TokenType.tyWord, "param") == false)
@@ -191,10 +191,10 @@ namespace PxPre.SynthSyn
             if(this.varLookups.ContainsKey(varname) == true)
                 throw new System.Exception($"Redefining variable {varname} on line {tokens[idx].line}.");
 
-            SynthVarValue newParam = new SynthVarValue();
+            SynVarValue newParam = new SynVarValue();
             newParam.typeName = typename;
             newParam.varName = varname;
-            newParam.varLoc = SynthVarValue.VarLocation.Parameter;
+            newParam.varLoc = SynVarValue.VarLocation.Parameter;
 
             idx = 3;
             if(tokens[idx].Matches(TokenType.tySymbol, "=") == true)
@@ -219,9 +219,9 @@ namespace PxPre.SynthSyn
 
         public void ParseFile(string filepath)
         {
-            SynthLog.LogHeader("Parsing file " + filepath);
+            SynLog.LogHeader("Parsing file " + filepath);
 
-            using (var scope = new SynthLog.LogScope())
+            using (var scope = new SynLog.LogScope())
             {
                 string fileContents = System.IO.File.ReadAllText(filepath);
                 this.ParseString(fileContents);
@@ -237,12 +237,12 @@ namespace PxPre.SynthSyn
 
         public override void Validate_AfterTypeAlignment(int logIndent)
         {
-            SynthLog.LogIndent(logIndent, $"Started Context.Validate_AfterTypeAlignment()");
+            SynLog.LogIndent(logIndent, $"Started Context.Validate_AfterTypeAlignment()");
 
             if (varDefs.Count != 0)
                 throw new SynthExceptionImpossible("Root context found with local members. Only global members should be possible.");
 
-            foreach(SynthFuncDecl scopeFn in this.EnumerateScopedFunctions())
+            foreach(SynFuncDecl scopeFn in this.EnumerateScopedFunctions())
             {
                 if(scopeFn.isStatic == false)
                     throw new SynthExceptionImpossible("Root context found with local methods. Only static functions should be possible.");
@@ -250,10 +250,10 @@ namespace PxPre.SynthSyn
 
             base.Validate_AfterTypeAlignment(logIndent + 1);
 
-            SynthLog.LogIndent(logIndent, $"Ended Context.Validate_AfterTypeAlignment()");
+            SynLog.LogIndent(logIndent, $"Ended Context.Validate_AfterTypeAlignment()");
         }
 
-        public override SynthContext CastContext()
+        public override SynContext CastContext()
         {
             return this;
         }
