@@ -86,7 +86,7 @@ namespace PxPre.SynthSyn
 
         public bool hasAddress;
         public SynthObj synthObj;
-        public SynthType evaluatingType;
+        public SynType evaluatingType;
         public Token token;
         public ASTOp astType;
         public List<AST> branches;
@@ -99,7 +99,7 @@ namespace PxPre.SynthSyn
             this.branches.AddRange(tas);
         }
 
-        public AST(Token t, SynthContextBuilder builder, ASTOp ast, SynthObj so, SynthType sevty, bool hasAddress, DataManifest manifest, params AST [] branches)
+        public AST(Token t, SynthContextBuilder builder, ASTOp ast, SynthObj so, SynType sevty, bool hasAddress, DataManifest manifest, params AST [] branches)
         { 
             this.builder        = builder;
             this.synthObj       = so;

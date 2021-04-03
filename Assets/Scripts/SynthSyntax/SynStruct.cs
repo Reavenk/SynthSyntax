@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace PxPre.SynthSyn
 {
-    public class SynthType_Struct : SynthType
+    public class SynStruct : SynType
     {
         public bool resolvedAlignments = false;
 
@@ -13,7 +13,7 @@ namespace PxPre.SynthSyn
         public int byteSize = 0;
 
 
-        public SynthType_Struct(SynthScope parentScope, string name)
+        public SynStruct(SynthScope parentScope, string name)
             : base(parentScope, name, false)
         { 
         }
@@ -31,7 +31,7 @@ namespace PxPre.SynthSyn
             return resolvedAlignments;
         }
 
-        public static SynthType_Struct Parse(SynthScope parentScope, List<Token> tokens)
+        public static SynStruct Parse(SynthScope parentScope, List<Token> tokens)
         {
             if (tokens[0].Matches(TokenType.tyWord, "struct") == false)
                 return null;
@@ -46,7 +46,7 @@ namespace PxPre.SynthSyn
             int idx = 2;
             Parser.MovePastScopeTSemi(ref idx, tokens);
 
-            SynthType_Struct ret = new SynthType_Struct(parentScope, tokens[0].fragment);
+            SynStruct ret = new SynStruct(parentScope, tokens[0].fragment);
             ret.typeName = tokens[1].fragment;
             ret.declarationTokens = tokens.GetRange(0, idx);
             tokens.RemoveRange(0, idx);
@@ -196,7 +196,7 @@ namespace PxPre.SynthSyn
             SynthLog.LogIndent(logIndent, $"End Struct.Validate_AfterTypeAlignment");
         }
 
-        public override SynthType_Struct GetStructScope()
+        public override SynStruct GetStructScope()
         {
             return this;
         }
@@ -232,6 +232,99 @@ namespace PxPre.SynthSyn
                 throw new SynthExceptionImpossible($"{this.typeName} found to have multiple destructors.");
 
             return lstFn[0];
+        }
+
+
+        /// <summary>
+        /// This function is expected to be called during AST construction
+        /// (of whatever needs the copy constructor). This means struct 
+        /// processing and alignment should have already occured. This also
+        /// means the function will be queued for being constructed into
+        /// WASM binary like all other functions in a later pass.
+        /// </summary>
+        /// <param name="autocreate">If the function doesn't exist, auto
+        /// create a default copy constructor and register it with the struct.
+        /// </param>
+        /// <returns>The found, or created, copy constructor for the struct.</returns>
+        public override SynthFuncDecl GetCopyConstructor(bool autocreate, SynthContextBuilder scb)
+        { 
+            List<SynthFuncDecl> lstFns;
+            if(this.functions.TryGetValue(this.typeName, out lstFns) == false)
+            { 
+                if(autocreate == false)
+                    return null;
+
+                // If we're autocreating, prepare a list for it to be registered in.
+                lstFns = new List<SynthFuncDecl>();
+                this.functions.Add(this.typeName, lstFns);
+            }
+            else
+            { 
+                foreach(SynthFuncDecl fns in lstFns)
+                { 
+                    if(fns.returnType != null)
+                        continue;
+
+                    if(fns.parameterSet.Count != 2)
+                        continue;
+
+                    if(
+                        fns.parameterSet.Get(0).type != this ||
+                        fns.parameterSet.Get(1).type != this)
+                    {
+                        continue;
+                    }
+
+                    return fns;
+                }
+
+                if(autocreate == false)
+                    return null;
+            }
+
+            SynthFuncDecl sfdCC = new SynthFuncDecl(this);
+            //
+            SynthVarValue svvDst = new SynthVarValue();
+            svvDst.varLoc = SynthVarValue.VarLocation.ThisRef;
+            svvDst.dataType = SynthVarValue.VarValueDataType.Pointer;
+            //
+            SynthVarValue svvSrc = new SynthVarValue();
+            svvSrc.varLoc = SynthVarValue.VarLocation.Parameter;
+            svvSrc.dataType = SynthVarValue.VarValueDataType.Reference;
+
+            sfdCC.parameterSet.AddParameter(svvDst);
+            sfdCC.parameterSet.AddParameter(svvSrc);
+
+            // TODO: Do explicit alignment here?
+
+            // Add this ahead of time
+            lstFns.Add(sfdCC);
+
+            // Go through each variable in order and copy them by producing the proper AST
+            for(int i = 0; i < this.varDefs.Count; ++i)
+            { 
+                SynthVarValue svv = this.varDefs[i];    // The member to copy
+                
+                if(svv.type.intrinsic == true)
+                {
+                    AST astSrcDeref = new AST(new Token(-1, svv.varName, TokenType.tyWord), scb, ASTOp.DerefName, null, svv.type, false, AST.DataManifest.Procedural);
+                    AST astSrcGetMember = new AST(new Token(), scb, ASTOp.GetMemberVar, svvSrc, this, false, AST.DataManifest.Procedural, astSrcDeref);
+
+                    AST astDstDeref = new AST(new Token(-1, svv.varName, TokenType.tyWord), scb, ASTOp.DerefName, null, svv.type, false, AST.DataManifest.Procedural);
+                    AST astDstGetMember = new AST(new Token(), scb, ASTOp.GetMemberVar, svvSrc, this, false, AST.DataManifest.Procedural, astSrcDeref);
+
+                    AST astSetVar = new AST(new Token(), scb, ASTOp.SetValue, null, null, false, AST.DataManifest.NoData, astSrcDeref, astSrcGetMember);
+                    sfdCC.ast.branches.Add(astSetVar);
+                }
+                else
+                {
+                    // Else, it's a sub-struct, and we use GetCopyConstructor() recursively
+                    // to copy it.
+                    throw new SynthExceptionCompile("Class copy constructors are not supported.");
+                }
+            }
+
+            return sfdCC;
         }
     }
 }

@@ -122,7 +122,7 @@ namespace PxPre.SynthSyn
             throw new SynthExceptionSyntax(tt.root, "Unknown syntax.");
         }
 
-        void AddLocalVariable(Token declTok, SynthType type, string varName)
+        void AddLocalVariable(Token declTok, SynType type, string varName)
         {
             // TODO: Validate varName isn't a reserved word
 
@@ -133,30 +133,16 @@ namespace PxPre.SynthSyn
                 throw new SynthExceptionSyntax(declTok, "Variable name already exists.");
             }
 
-            if (type.intrinsic == true)
-            {
-                // If we're dealing with an intrinsic value type, they're either 
-                // 4 or 8 bytes, and can fit on the actual WASM stack.
-                ValueRef vr = new ValueRef(ValueLoc.LocalIdx, locStkEle.Count, this.totalLocalStack, type);
-                this.locStkEle.Add(vr);
-                this.locStkVars.Add(varName, vr);
-                ++this.totalLocalStack;
+            // Everything that's complex gets put on the secondary stack in the WASM mem
+            // section. The biggest issue we're trying to solve with the secondary stack is
+            // arbitrary byte alignment. A traditional WASM stack can't run through variable
+            // bytes, and only allows alignments that are a multiple of 4.
+            ValueRef vr = new ValueRef(ValueLoc.ValueOnMemStack, memStkEle.Count, this.totalMemoryStackBytes, type);
+            this.memStkEle.Add(vr);
+            this.memStkVars.Add(varName, vr);
+            this.totalMemoryStackBytes += type.GetByteSize();
 
-                this.allLocalVars.Add(vr);
-            }
-            else
-            { 
-                // Everything that's complex gets put on the secondary stack in the WASM mem
-                // section. The biggest issue we're trying to solve with the secondary stack is
-                // arbitrary byte alignment. A traditional WASM stack can't run through variable
-                // bytes, and only allows alignments that are a multiple of 4.
-                ValueRef vr = new ValueRef(ValueLoc.ValueOnMemStack, memStkEle.Count, this.totalMemoryStackBytes, type);
-                this.memStkEle.Add(vr);
-                this.memStkVars.Add(varName, vr);
-                this.totalMemoryStackBytes += type.GetByteSize();
-
-                this.allLocalVars.Add(vr);
-            }
+            this.allLocalVars.Add(vr);
         }
 
         public ValueRef GetLocalVariable(string name, bool recursive = true)
@@ -603,7 +589,7 @@ namespace PxPre.SynthSyn
                         throw new SynthExceptionImpossible("Invalid AST branches for casting.");
 
                     string typeCast = node.root.fragment;
-                    SynthType styCast = intrinsicSource.GetType(typeCast);
+                    SynType styCast = intrinsicSource.GetType(typeCast);
 
                     if(styCast == null)
                         throw new SynthExceptionSyntax(node.root, "Could not find existed casted type.");
@@ -637,7 +623,7 @@ namespace PxPre.SynthSyn
                     if(function.isStatic == true)
                         throw new SynthExceptionSyntax(node.root, "this cannot be used in a static function.");
 
-                    SynthType_Struct rootScope = function.GetStructScope();
+                    SynStruct rootScope = function.GetStructScope();
                     return new AST(node.root, this, ASTOp.GetThis, rootScope, rootScope, true, AST.DataManifest.Procedural);
                 }
 
@@ -652,7 +638,7 @@ namespace PxPre.SynthSyn
 
                 // If it matches a known type, we've detected the token is attempting
                 // to declare a variable in local scope.
-                SynthType sty = function.GetType(node.root.fragment);
+                SynType sty = function.GetType(node.root.fragment);
                 if(sty != null)
                 { 
                     // Constructor is already handled elsewhere
@@ -891,7 +877,7 @@ namespace PxPre.SynthSyn
                         { 
                             // If it's a type, get a function from the type with the typenames -
                             // which are the constructors.
-                            SynthType styFrag = function.GetType(fragName);
+                            SynType styFrag = function.GetType(fragName);
                             if(styFrag != null)
                             { 
                                 SynthCanidateFunctions consFns = styFrag.GetCanidateFunctions(fragName);
@@ -1230,7 +1216,7 @@ namespace PxPre.SynthSyn
             if(left.evaluatingType == right.evaluatingType)
                 return;
 
-            SynthType castedTy = GetSignificantIntrinsicType(left.evaluatingType, right.evaluatingType, left.token);
+            SynType castedTy = GetSignificantIntrinsicType(left.evaluatingType, right.evaluatingType, left.token);
 
             EnsureIntrinsicCompatibility(ref left, ref right, allowCastingLeft);
 
@@ -1240,14 +1226,14 @@ namespace PxPre.SynthSyn
                 throw new SynthExceptionSyntax(tt.root, $"Error parsing {tt.root.fragment}, left side expected to be addressable.");
         }
 
-        public static void EnsureTypeIsInt(SynthType sty, Token tErrSrc)
+        public static void EnsureTypeIsInt(SynType sty, Token tErrSrc)
         { 
             // They happen to be the same
             // TODO: figure out best way to throw correct error message
             EnsureTypeIsBitCompatible(sty, tErrSrc);
         }
 
-        public static void EnsureTypeIsBitCompatible(SynthType sty, Token tErrSrc)
+        public static void EnsureTypeIsBitCompatible(SynType sty, Token tErrSrc)
         { 
             switch(sty.typeName)
             { 
@@ -1266,7 +1252,7 @@ namespace PxPre.SynthSyn
             }
         }
 
-        public static SynthType GetSignificantIntrinsicType(SynthType left, SynthType right, Token tok)
+        public static SynType GetSignificantIntrinsicType(SynType left, SynType right, Token tok)
         { 
             if(left.intrinsic == false || right.intrinsic == false)
                 throw new SynthExceptionImpossible("Attempting to get significant intrinsic type with a non-intrinsic.");
@@ -1364,7 +1350,7 @@ namespace PxPre.SynthSyn
             if (left.evaluatingType.intrinsic == false || right.evaluatingType.intrinsic == false)
                     throw new SynthExceptionImpossible("Checking instrinsic compatibility of non-intrinsic character.");
 
-            SynthType stySig = GetSignificantIntrinsicType(left.evaluatingType, right.evaluatingType, left.token);
+            SynType stySig = GetSignificantIntrinsicType(left.evaluatingType, right.evaluatingType, left.token);
 
             if(left.evaluatingType != stySig)
             {
@@ -1392,7 +1378,7 @@ namespace PxPre.SynthSyn
             }
         }
 
-        public void EnsureIntrinsicCompatibility(SynthType leftTy, ref AST right, bool allowReverseForce)
+        public void EnsureIntrinsicCompatibility(SynType leftTy, ref AST right, bool allowReverseForce)
         { 
             if(right.evaluatingType == leftTy)
                 return;
@@ -1400,7 +1386,7 @@ namespace PxPre.SynthSyn
             if (leftTy.intrinsic == false || right.evaluatingType.intrinsic == false)
                 throw new SynthExceptionImpossible("Checking instrinsic compatibility of non-intrinsic character.");
 
-            SynthType stySig = GetSignificantIntrinsicType(leftTy, right.evaluatingType, right.token);
+            SynType stySig = GetSignificantIntrinsicType(leftTy, right.evaluatingType, right.token);
             if(stySig != leftTy)
             {
                 if(allowReverseForce == false)
@@ -1625,7 +1611,7 @@ namespace PxPre.SynthSyn
 
                 case ASTOp.GetThis:
                     {
-                        SynthType styThis = fnd.GetStructScope();
+                        SynType styThis = fnd.GetStructScope();
                         if(styThis == null)
                             throw new SynthExceptionSyntax(expr.token, "Illegal scope for use of 'this' keyword.");
 
@@ -2131,6 +2117,7 @@ namespace PxPre.SynthSyn
                 case ASTOp.RegisterLocalVar:
                     // The language doesn't return any kind of value for registering a local.
                     {
+                        // The variable being registered
                         ValueRef vrReg = this.GetLocalVariable(expr.branches[0].token.fragment);
 
                         // The first branch is the variable name, the second is 
@@ -2149,12 +2136,41 @@ namespace PxPre.SynthSyn
                             }
                             else
                             {
-                                // This will put/calculate the evaluated intrinsic value on the stack.
-                                ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[1], wasmBuild, ctxBuilder, fnBuild);
-                                if(vr.varType.intrinsic == false)
-                                    throw new SynthExceptionCompile("Initializing non-intrinsic variables on the stack is currently not supported.");
+                                if(
+                                    vrReg.valLoc == ValueLoc.NoValue || 
+                                    vrReg.valLoc == ValueLoc.ValueOnStack)
+                                {
+                                    throw new SynthExceptionImpossible($"Cannot initialize local variable at location {vrReg.valLoc}.");
+                                }
+                                else if (
+                                    vrReg.valLoc == ValueLoc.PointerOnStack ||
+                                    vrReg.valLoc == ValueLoc.ValueOnHeap ||
+                                    vrReg.valLoc == ValueLoc.ValueOnMemStack )
+                                {
+                                    // The top item is a pointer                                    
+                                    vrReg.PutLocalVarAddressOnStack(fnBuild);
 
-                                fnBuild.Add_LocalSet((uint)vrReg.idx);
+                                    // This will put/calculate the evaluated intrinsic value on the stack.
+                                    ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[1], wasmBuild, ctxBuilder, fnBuild);
+                                    if (vr.varType.intrinsic == false)
+                                        throw new SynthExceptionCompile("Initializing non-intrinsic variables on the stack is currently not supported.");
+                                    vr.PutInstrinsicValueOnStack(fnBuild);
+
+                                    vrReg.StoreIntrinsicValue(fnBuild);
+                                }
+                                else if( vrReg.valLoc == ValueLoc.LocalIdx)
+                                {
+                                    // This will put/calculate the evaluated intrinsic value on the stack.
+                                    ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[1], wasmBuild, ctxBuilder, fnBuild);
+                                    if (vr.varType.intrinsic == false)
+                                        throw new SynthExceptionCompile("Initializing non-intrinsic variables on the stack is currently not supported.");
+
+                                    vr.PutInstrinsicValueOnStack(fnBuild);
+
+                                    fnBuild.Add_LocalSet((uint)vrReg.idx);
+                                }
+                                else
+                                    throw new SynthExceptionImpossible("Could not set value when initializing local variable.");
                             }
                         }
                         else if(vrReg.varType.intrinsic == false)
@@ -2253,7 +2269,7 @@ namespace PxPre.SynthSyn
 
                         // All explicit intrinsic casts should be supported, so no validation should be necessary.
 
-                        SynthType styCastTo = expr.evaluatingType;
+                        SynType styCastTo = expr.evaluatingType;
                         ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
                         vr.PutInstrinsicValueOnStack(fnBuild);
                         CastIntrinsicOnStack(vr.varType, styCastTo, fnBuild);
@@ -2265,7 +2281,7 @@ namespace PxPre.SynthSyn
                         if (expr.branches.Count != 1)
                             throw new SynthExceptionImpossible("Attempting to cast with unexpected number of branches.");
 
-                        SynthType styCastTo = expr.evaluatingType;
+                        SynType styCastTo = expr.evaluatingType;
                         ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
                         vr.PutInstrinsicValueOnStack(fnBuild);
 
@@ -2391,7 +2407,7 @@ namespace PxPre.SynthSyn
                                 continue;
 
                             vrToDestr.PutLocalVarAddressOnStack(fnBuild);
-                            this.BuildBSFunctionDirectInvoke(fnDestr, wasmBuild, fnBuild);
+                            this.BuildBSFunctionDirectInvoke(fnDestr, fnd, wasmBuild, fnBuild);
                         }
                         return new ValueRef(ValueLoc.NoValue, -1, -1, null);
                     }
@@ -2424,7 +2440,7 @@ namespace PxPre.SynthSyn
         /// <param name="styOrig">The original type on the stack.</param>
         /// <param name="styCastTo">The type to convert the value to.</param>
         /// <param name="build">The WASM program to emit the casting instructions to.</param>
-        public void CastIntrinsicOnStack(SynthType styOrig, SynthType styCastTo, WASMByteBuilder build)
+        public void CastIntrinsicOnStack(SynType styOrig, SynType styCastTo, WASMByteBuilder build)
         { 
             CastIntrinsicOnStack(styOrig.typeName, styCastTo.typeName, build);
         }
@@ -2646,7 +2662,7 @@ namespace PxPre.SynthSyn
                     vr.PutInstrinsicValueOnStack(fnBuild);
             }
 
-            return BuildBSFunctionDirectInvoke(fnInvoke, wasmBuild, fnBuild);
+            return BuildBSFunctionDirectInvoke(fnInvoke, fnd, wasmBuild, fnBuild);
         }
 
         /// <summary>
@@ -2655,12 +2671,14 @@ namespace PxPre.SynthSyn
         /// This should be called for a function without any parameters, or for a function
         /// whos parameters are already set up.
         /// </summary>
+        /// <param name="fnCallContext">The function that the invoked function was called in.</param>
         /// <param name="fnInvoke">The function to invoke.</param>
         /// <param name="wasmBuild">The wasm compiler utility.</param>
         /// <param name="fnBuild">The wasm binary being generated.</param>
         /// <returns>Information on the location of the return value.</returns>
         public ValueRef BuildBSFunctionDirectInvoke(
             SynthFuncDecl fnInvoke,
+            SynthFuncDecl fnCallContext,
             WASMBuild wasmBuild,
             WASMByteBuilder fnBuild)
         {
@@ -2669,12 +2687,56 @@ namespace PxPre.SynthSyn
             if (fnIdx.HasValue == false)
                 throw new SynthExceptionImpossible("Cound not find registered index of function");
 
+            // If the current function calling the invokee needs the mem stack, and the 
+            // invoked function needs the memstack, offset the mem stack pointer. Or else
+            // do a little optimization and ignore the offset.
+            int invokeMemParam = fnInvoke.parameterSet.TotalMemStackByte;
+            int invokeMemStack = fnInvoke.memoryStackSize;
+            //
+            int ctxMemParam = fnCallContext.parameterSet.TotalMemStackByte;
+            int ctxMemStack = fnCallContext.memoryStackSize;
+            //
+            bool requireMemStackShift = 
+                (invokeMemParam + invokeMemStack > 0) && 
+                (ctxMemParam + ctxMemStack > 0);
+
+            if(requireMemStackShift == true)
+            { 
+                // Add the offset of how much memory the invoking function
+                // requires so the invoked function doens't overwrite it.
+                fnBuild.AddLEB128(0); // Store Dst
+                {
+                    fnBuild.AddLEB128(0);   // Load Src
+                    fnBuild.Add_I32Load();  // Deref
+
+                    // Offset
+                    fnBuild.AddLEB128((uint)ctxMemParam + ctxMemStack);
+                    fnBuild.AddInstr(WASM.Instruction.i32_add);
+                }
+                fnBuild.Add_I32Store();
+            }
+
             fnBuild.AddInstr(WASM.Instruction.call);
             fnBuild.AddLEB128(fnIdx.Value);
 
+            if(requireMemStackShift == true)
+            { 
+                // Restore the offset/shift.
+                // It's the same process as above, only we're subtracting.
+                fnBuild.AddLEB128(0); // Store Dst
+                { 
+                    fnBuild.AddLEB128(0);
+                    fnBuild.Add_I32Load();
+                    fnBuild.AddLEB128((uint)ctxMemParam + ctxMemStack);
+                    fnBuild.AddInstr(WASM.Instruction.i32_sub);
+
+                }
+                fnBuild.Add_I32Store();
+            }
+
             // TODO: Figure out where return value (if any) is and
             // place it in the return value.
-            if (fnInvoke.returnType == null)
+                if (fnInvoke.returnType == null)
                 return new ValueRef(ValueLoc.NoValue, 0, 0, null);
             else if (fnInvoke.returnType.intrinsic == true)
                 return new ValueRef(ValueLoc.ValueOnStack, 0, 0, fnInvoke.returnType);
@@ -2688,12 +2750,12 @@ namespace PxPre.SynthSyn
                 throw new SynthExceptionImpossible("Tree encountered unexpected children.");
         }
 
-        public void PushType(SynthType type)
+        public void PushType(SynType type)
         { 
             // TODO:
         }
 
-        public void PopType(SynthType type)
+        public void PopType(SynType type)
         { 
             //TODO:
         }

@@ -7,10 +7,27 @@ namespace PxPre.SynthSyn
 {
     public class SynthScope : SynthObj
     {
+        /// <summary>
+        /// The state of progress for a set of things being processed.
+        /// </summary>
         public enum TypeConsolidate
         { 
+            /// <summary>
+            /// All entries have been sucessfully processed.
+            /// </summary>
             AllDetermined,
+
+            /// <summary>
+            /// Not all entries are sucessfully processed, but during the
+            /// current processing pass, not progress was made.
+            /// </summary>
             UndeterminedNoChange,
+
+            /// <summary>
+            /// Not all entries are successfully processed, but during the
+            /// curent processing pass, one or more entries were successfully
+            /// processed.
+            /// </summary>
             UndeterminedProgress
         }
 
@@ -31,7 +48,7 @@ namespace PxPre.SynthSyn
 
         public List<Token> declPhrase = new List<Token>();
     
-        protected Dictionary<string, SynthType> typesDefs = new Dictionary<string, SynthType>();
+        protected Dictionary<string, SynType> typesDefs = new Dictionary<string, SynType>();
 
         protected Dictionary<string, List<SynthFuncDecl>> functions = new Dictionary<string, List<SynthFuncDecl>>();
         public IReadOnlyDictionary<string, List<SynthFuncDecl>> Functions {get{return this.functions; } }
@@ -46,7 +63,6 @@ namespace PxPre.SynthSyn
 
         protected Dictionary<string, SynthRegion> regions = new Dictionary<string, SynthRegion>();
 
-        public int localStackSize = -1;
         public int memoryStackSize = -1;
 
         public SynthScope(SynthScope parent)
@@ -68,7 +84,7 @@ namespace PxPre.SynthSyn
             return false;
         }
 
-        public SynthType_Struct ExtractVariableDecl(List<Token> tokens, int start, ref int end)
+        public SynStruct ExtractVariableDecl(List<Token> tokens, int start, ref int end)
         { 
             // TODO: Remove?
             return null;
@@ -92,9 +108,9 @@ namespace PxPre.SynthSyn
             return null;
         }
 
-        public SynthType GetType(string typename, bool recursion = true)
+        public SynType GetType(string typename, bool recursion = true)
         { 
-            SynthType ret;
+            SynType ret;
             if(this.typesDefs.TryGetValue(typename, out ret) == true)
                 return ret;
 
@@ -127,7 +143,7 @@ namespace PxPre.SynthSyn
             int alreadyDet = 0;
             int newlyDet = 0;
 
-            foreach(KeyValuePair<string, SynthType> kvp in this.typesDefs)
+            foreach(KeyValuePair<string, SynType> kvp in this.typesDefs)
             {
                 TypeConsolidate tc = kvp.Value.ResolveStaticTypeAlignments();
 
@@ -154,7 +170,7 @@ namespace PxPre.SynthSyn
                 this.AddLocalVariable(var);
         }
 
-        public SynthVarValue AddLocalVariable(string varName, SynthType ty)
+        public SynthVarValue AddLocalVariable(string varName, SynType ty)
         {
             return this.AddVariable(varName, ty, VarDst.Local, SynthVarValue.VarLocation.Local);
         }
@@ -169,7 +185,7 @@ namespace PxPre.SynthSyn
             this.AddVariable(var, VarDst.Local);
         }
 
-        public SynthVarValue AddGlobalVar(string varName, SynthType ty)
+        public SynthVarValue AddGlobalVar(string varName, SynType ty)
         {
             return this.AddVariable(varName, ty, VarDst.Global, SynthVarValue.VarLocation.Static);
         }
@@ -184,7 +200,7 @@ namespace PxPre.SynthSyn
             this.AddVariable(var, VarDst.Global);
         }
 
-        public SynthVarValue AddVariable(string varName, SynthType ty, VarDst dst, SynthVarValue.VarLocation varLoc)
+        public SynthVarValue AddVariable(string varName, SynType ty, VarDst dst, SynthVarValue.VarLocation varLoc)
         {
             SynthVarValue newVar = new SynthVarValue();
             newVar.varLoc = varLoc;
@@ -255,7 +271,7 @@ namespace PxPre.SynthSyn
             fns.Add(fnAdding);
         }
 
-        public void AddType(SynthType type)
+        public void AddType(SynType type)
         { 
             this.typesDefs.Add(type.typeName, type);
         }
@@ -325,7 +341,7 @@ namespace PxPre.SynthSyn
         /// <param name="otherType"></param>
         /// <param name="reversible">If true, only reversible functions are </param>
         /// <returns></returns>
-        public SynthFuncDecl GetOperator(string opName, SynthType otherType, OperatorReversing revMode)
+        public SynthFuncDecl GetOperator(string opName, SynType otherType, OperatorReversing revMode)
         { 
             string fullName = "operator" + opName;
 
@@ -408,7 +424,7 @@ namespace PxPre.SynthSyn
                 this.parentScope.FillFunctionList(functionName, scope, lst);
         }
 
-        public virtual SynthType_Struct GetStructScope()
+        public virtual SynStruct GetStructScope()
         { 
             if(this.parentScope == null)
                 return null;

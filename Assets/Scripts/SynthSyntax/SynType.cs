@@ -5,12 +5,12 @@ using UnityEngine;
 namespace PxPre.SynthSyn
 {
     // Custom types
-    public abstract class SynthType : SynthScope
+    public abstract class SynType : SynthScope
     {    
         public string typeName;
         public bool intrinsic;
 
-        public SynthType(SynthScope parent, string name, bool intrinsic)
+        public SynType(SynthScope parent, string name, bool intrinsic)
             : base(parent)
         { 
             this.typeName = name;
@@ -24,20 +24,14 @@ namespace PxPre.SynthSyn
         // because of different scopes
         public virtual void RegisterContainedValueTypes(HashSet<string> registered){ }
 
-        public override SynthType CastType()
+        public override SynType CastType()
         {
             return this;
         }
 
-        public virtual SynthFuncDecl GetDefaultConstructor()
-        { 
-            return null;
-        }
-
-        public virtual SynthFuncDecl GetDestructor()
-        { 
-            return null;
-        }
+        public virtual SynthFuncDecl GetDefaultConstructor() => null;
+        public virtual SynthFuncDecl GetDestructor() => null;
+        public virtual SynthFuncDecl GetCopyConstructor(bool autocreate, SynthContextBuilder scb) => null;
     }
 
 

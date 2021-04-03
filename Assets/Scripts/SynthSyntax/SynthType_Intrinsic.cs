@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace PxPre.SynthSyn
 {
-    public class SynthType_Intrinsic : SynthType
+    public class SynthType_Intrinsic : SynType
     {
         public int byteSize;
 

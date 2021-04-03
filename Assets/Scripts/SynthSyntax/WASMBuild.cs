@@ -138,7 +138,7 @@ namespace PxPre.SynthSyn
             return ftyNew.index;
         }
 
-        WASM.Bin.TypeID GetTrueParamReturnType(SynthType st)
+        WASM.Bin.TypeID GetTrueParamReturnType(SynType st)
         {
             if(st == null)
                 return WASM.Bin.TypeID.Empty;

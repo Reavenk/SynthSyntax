@@ -31,7 +31,7 @@ namespace PxPre.SynthSyn
             this.RegisterType(new SynthType_Intrinsic(this, "float64",8));
         }
 
-        public void RegisterType(SynthType sty)
+        public void RegisterType(SynType sty)
         { 
             if(this.typesDefs.ContainsKey(sty.typeName) == true)
                 throw new System.Exception("Attempting to register typename that is already assigned.");
@@ -73,7 +73,7 @@ namespace PxPre.SynthSyn
                 // Struct parsing
                 if(tokens[0].Matches(TokenType.tyWord, "struct") == true)
                 {
-                    SynthType_Struct sst = SynthType_Struct.Parse(this, tokens);
+                    SynStruct sst = SynStruct.Parse(this, tokens);
                     if (sst != null)
                     {
                         this.AddType(sst);

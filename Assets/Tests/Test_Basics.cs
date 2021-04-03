@@ -77,9 +77,9 @@ namespace Tests
         }
 
         [Test]
-        public void Test013()
+        public void Test013_LineMacro()
         {
-            UnitTest_Utils.PerformContainedTest("SynthScripts/Simple/Vali_Simple013.synsyn");
+            UnitTest_Utils.PerformContainedTest("SynthScripts/Simple/Vali_Simple013_LineMacro.synsyn");
         }
     }
 }

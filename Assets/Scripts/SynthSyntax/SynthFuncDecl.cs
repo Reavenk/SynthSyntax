@@ -76,7 +76,7 @@ namespace PxPre.SynthSyn
         /// A reference to the processed return type - the type (in scope) whos
         /// typename matches returnTyName.
         /// </summary>
-        public SynthType returnType;
+        public SynType returnType;
 
         public SynthFuncParamSet parameterSet = new SynthFuncParamSet();
 
@@ -101,8 +101,6 @@ namespace PxPre.SynthSyn
         /// parenthesis were found to start.
         /// </summary>
         public int parenStart = -1;
-
-        public int paramByteSize = -1;
 
         public List<List<Token>> executingLines = new List<List<Token>>();
 
@@ -482,7 +480,7 @@ namespace PxPre.SynthSyn
 
             if(this.isStatic == false)
             { 
-                SynthType styThis = this.GetStructScope();
+                SynType styThis = this.GetStructScope();
                 this.parameterSet.AddThisParam(styThis);
             }
 
@@ -517,7 +515,7 @@ namespace PxPre.SynthSyn
                     if(Parser.EatLeadingSemicolons(fnBodPhrase) == true)
                         continue;
 
-                    SynthType_Struct sst = SynthType_Struct.Parse(this, fnBodPhrase);
+                    SynStruct sst = SynStruct.Parse(this, fnBodPhrase);
                     if(sst != null)
                     { 
                         this.AddType(sst);
@@ -563,7 +561,7 @@ namespace PxPre.SynthSyn
             SynthLog.LogIndent(logIndent + 1, "Checking return value type:");
             if (string.IsNullOrEmpty(this.returnTyName) == false)
             { 
-                SynthType ret = this.GetType(this.returnTyName);
+                SynType ret = this.GetType(this.returnTyName);
                 if(ret == null)
                 {
                     throw new SynthExceptionSyntax(
@@ -595,7 +593,7 @@ namespace PxPre.SynthSyn
                 { 
                     SynthVarValue svvParam = this.parameterSet.Get(i);
 
-                    SynthType p = this.GetType(svvParam.typeName);
+                    SynType p = this.GetType(svvParam.typeName);
                     if(p == null)
                     {
                         throw new SynthExceptionSyntax(

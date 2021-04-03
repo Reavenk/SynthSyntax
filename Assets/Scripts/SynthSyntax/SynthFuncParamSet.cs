@@ -19,7 +19,7 @@ namespace PxPre.SynthSyn
         public int TotalLocalIndices {get => this.totalLocalIndices; }
         public int TotalMemStackByte {get => this.totalMemStackBytes; }
 
-        public void AddThisParam(SynthType styThis)
+        public void AddThisParam(SynType styThis)
         {
             if (styThis == null)
                 throw new SynthExceptionImpossible("No parent struct type to define 'this' for struct function.");
@@ -200,6 +200,10 @@ namespace PxPre.SynthSyn
             }
         }
 
+        /// <summary>
+        /// Check if the first parameter of the parameter list is the 'this' parameter.
+        /// </summary>
+        /// <returns></returns>
         public bool HasThis()
         {
             return 

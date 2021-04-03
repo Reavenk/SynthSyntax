@@ -43,7 +43,7 @@ namespace PxPre.SynthSyn
         public string varName;
 
         public string typeName;
-        public SynthType type;
+        public SynType type;
 
         public VarLocation varLoc;
 

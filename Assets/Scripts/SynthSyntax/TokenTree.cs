@@ -62,7 +62,7 @@ namespace PxPre.SynthSyn
                 // Is a local variable being declared?
                 if(tokens[0].Matches(TokenType.tyWord) == true)
                 { 
-                    SynthType sty = scope.GetType(tokens[0].fragment);
+                    SynType sty = scope.GetType(tokens[0].fragment);
                     if(sty != null)
                     { 
                         TokenTree ttVarDecl = new TokenTree(keyVarDecl);
@@ -581,7 +581,7 @@ namespace PxPre.SynthSyn
                 return nodes[0];
             }
 
-            SynthType st = scope.GetType(nodes[0].root.fragment);
+            SynType st = scope.GetType(nodes[0].root.fragment);
             if(st != null)
             { 
                 // TODO: Combine this with intrinsic declarations?
