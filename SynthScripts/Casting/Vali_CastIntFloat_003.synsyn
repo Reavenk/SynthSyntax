@@ -1,4 +1,4 @@
-// Testing cast int->float
+// Testing cast int->float.
 //
 // Explicit casting isn't an effective operation, but should
 // still be allowed.
