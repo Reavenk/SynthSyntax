@@ -17,6 +17,9 @@ namespace PxPre.SynthSyn
         GetThis,
         Construct,
 
+        LoadPtrAddr,
+        DerefPtrAddr,
+
         Destruct,
 
         /// <summary>

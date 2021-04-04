@@ -28,8 +28,22 @@ namespace PxPre.SynthSyn
         /// </summary>
         public Token root;
 
-        // Only used for special nestings keywords:
-        // ["if", "while", "for"]
+        // Used for special nestings keywords:
+        // ["if", "while", "for", "dowhile"]
+        //
+        // Or for labeling specific contexts if ambiguities are possible.
+        //
+        // "paren"
+        //      Parenthesis scope, usually for function calls.
+        //
+        // "cast"
+        //      Parenthesis scope, for casting.
+        //
+        // "deref"
+        //      Used for * dereference calls to differentiate from * multiplies.
+        //
+        // "index"
+        //      Used for square brackets [] for indexing.
         public string keyword = ""; 
 
         public List<Token> toksToProcess = new List<Token>();
@@ -419,8 +433,23 @@ namespace PxPre.SynthSyn
                 }
             }
 
-            for (int i = nodes.Count - 1; i >= 0; --i)
+            for (int i = nodes.Count - 1; i >= 1; --i)
             { 
+                if(
+                    nodes[i].root.Matches(TokenType.tySymbol, "*") == true && 
+                    nodes[i - 1].root.Matches(TokenType.tySymbol) == true &&
+                    // Most symbols aren't dereferenceable, which is how we tell when
+                    // an asterisk is a dereference or a multiply - except for parenthesis
+                    // and indexing.
+                    // (The indexing thing I'm not actually 100% sure. We'll address this when
+                    // we get to indexing.)
+                    nodes[i - 1].root.MatchesSymbol("(") == false && 
+                    nodes[i - 1].root.MatchesSymbol("[") == false)
+                {
+                    // If it's next to another symbol, it's a pointer.
+                    continue;
+                }
+
                 if(
                     nodes[i].root.Matches(TokenType.tySymbol, "*") == true ||
                     nodes[i].root.Matches(TokenType.tySymbol, "/") == true ||
@@ -501,6 +530,21 @@ namespace PxPre.SynthSyn
 
             if (nodes.Count == 1)
                 return nodes[0];
+
+            // The "*" should be handled right before the "." is handled.
+            if(nodes[0].root.MatchesSymbol("*") == true)
+            { 
+                TokenTree ttRet = nodes[0];
+                ttRet.keyword = "deref";
+                nodes.RemoveAt(0);
+
+                if(nodes.Count == 0)
+                    throw new SynthExceptionImpossible("* missing defining expression.");
+
+                ttRet.nodes.Add(ConsolidateTokenTree(nodes, scope, false));
+
+                return ttRet;
+            }
 
             // The @ should be handled right before the "." is handled.
             if (nodes[0].root.MatchesSymbol("@") == true)

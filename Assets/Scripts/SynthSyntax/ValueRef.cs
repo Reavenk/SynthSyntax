@@ -76,25 +76,46 @@
         /// </summary>
         public int fnByteAlign;
 
-        /// <summary>
-        /// The pointer indirection amount. A value of 0 is the actual variable
-        /// value. A value of 1 is a pointer. A value of 2 is a pointer to a 
-        /// pointer, etc.
-        /// </summary>
-        public int pointerAmt = 0;
+        public SynTypeDepth typeDepth;
+
+        public int pointerDepth 
+        { 
+            get => this.typeDepth.ptrDepth;
+            set 
+            { 
+                this.typeDepth.ptrDepth = value;
+            }
+        }
 
         /// <summary>
         /// How to interpret the ValueRef.
         /// </summary>
-        public SynType varType;
+        public SynType varType
+        { 
+            get => this.typeDepth.type;
+            set
+            { 
+                this.typeDepth.type = value;
+            }
+        }
 
-        public ValueRef(ValueLoc valLoc, int idx, int byteAlign, SynType varType, int pointerAmt = 0)
+        public ValueRef(ValueLoc valLoc, int idx, int byteAlign, SynType varType, int pointerDepth = 0)
         {
             this.valLoc = valLoc;
             this.idx = idx;
             this.byteAlign = byteAlign;
             this.varType = varType;
-            this.pointerAmt = pointerAmt;
+            this.pointerDepth = pointerDepth;
+        }
+
+        public ValueRef Clone()
+        { 
+            return new ValueRef(
+                this.valLoc, 
+                this.idx, 
+                this.byteAlign, 
+                this.varType, 
+                this.pointerDepth);
         }
 
         public void PutInstrinsicValueOnStack(WASMByteBuilder fnBuild)
@@ -238,6 +259,19 @@
                 default:
                     throw new SynthExceptionImpossible($"Attempting to store intrinsic of unknown type {this.varType.typeName}.");
             }
+        }
+
+        public int GetByteSize()
+        {
+            if(this.IsPtr() == true)
+                return 4;
+
+            return this.varType.GetByteSize();
+        }
+
+        public bool IsPtr()
+        { 
+            return this.pointerDepth != 0;
         }
     }
 }

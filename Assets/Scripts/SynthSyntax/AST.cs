@@ -87,6 +87,7 @@ namespace PxPre.SynthSyn
         public bool hasAddress;
         public SynObj synthObj;
         public SynType evaluatingType;
+        public int ptrDepth = -1;
         public Token token;
         public ASTOp astType;
         public List<AST> branches;
@@ -99,7 +100,7 @@ namespace PxPre.SynthSyn
             this.branches.AddRange(tas);
         }
 
-        public AST(Token t, SynNestingBuilder builder, ASTOp ast, SynObj so, SynType sevty, bool hasAddress, DataManifest manifest, params AST [] branches)
+        public AST(Token t, SynNestingBuilder builder, ASTOp ast, SynObj so, SynType sevty, bool hasAddress, DataManifest manifest, int ptrDepth, params AST [] branches)
         { 
             this.builder        = builder;
             this.synthObj       = so;
@@ -108,6 +109,7 @@ namespace PxPre.SynthSyn
             this.astType        = ast;
             this.hasAddress     = hasAddress;
             this.manifest       = manifest;
+            this.ptrDepth       = ptrDepth;
 
             this.branches = new List<AST>(); // Should we always allocate this?
             if(branches != null && branches.Length > 0)
@@ -124,7 +126,8 @@ namespace PxPre.SynthSyn
                     this.synthObj, 
                     this.evaluatingType, 
                     this.hasAddress,
-                    this.manifest);
+                    this.manifest,
+                    this.ptrDepth);
 
             if(deep == true)
             { 

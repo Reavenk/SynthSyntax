@@ -121,7 +121,7 @@ namespace PxPre.SynthSyn
             throw new SynthExceptionSyntax(tt.root, "Unknown syntax.");
         }
 
-        void AddLocalVariable(Token declTok, SynType type, string varName)
+        void AddLocalVariable(Token declTok, SynType type, string varName, int ptrDepth)
         {
             // TODO: Validate varName isn't a reserved word
 
@@ -136,10 +136,10 @@ namespace PxPre.SynthSyn
             // section. The biggest issue we're trying to solve with the secondary stack is
             // arbitrary byte alignment. A traditional WASM stack can't run through variable
             // bytes, and only allows alignments that are a multiple of 4.
-            ValueRef vr = new ValueRef(ValueLoc.ValueOnMemStack, memStkEle.Count, this.totalMemoryStackBytes, type);
+            ValueRef vr = new ValueRef(ValueLoc.ValueOnMemStack, memStkEle.Count, this.totalMemoryStackBytes, type, ptrDepth);
             this.memStkEle.Add(vr);
             this.memStkVars.Add(varName, vr);
-            this.totalMemoryStackBytes += type.GetByteSize();
+            this.totalMemoryStackBytes += vr.GetByteSize();
 
             this.allLocalVars.Add(vr);
         }
@@ -239,6 +239,7 @@ namespace PxPre.SynthSyn
                             scope.GetType("bool"), 
                             false,
                             AST.CombineManifests(left, right), 
+                            0,
                             left, 
                             right);
                     }
@@ -275,6 +276,7 @@ namespace PxPre.SynthSyn
                             scope.GetType("bool"), 
                             false,
                             AST.CombineManifests(left, right), 
+                            0,
                             left, 
                             right);
                     }
@@ -311,6 +313,7 @@ namespace PxPre.SynthSyn
                             left.evaluatingType, 
                             false,
                             AST.CombineManifests(left, right), 
+                            0,
                             left, 
                             right);
                     }
@@ -344,6 +347,7 @@ namespace PxPre.SynthSyn
                             null, left.evaluatingType, 
                             false,
                             AST.CombineManifests(left, right), 
+                            0,
                             left, 
                             right);
                     }
@@ -371,16 +375,16 @@ namespace PxPre.SynthSyn
             switch(tt.root.type)
             { 
                 case TokenType.tyDouble:
-                    return new AST(tt.root, this, ASTOp.DeclFloat64, null, scope.GetType("double"), false, AST.DataManifest.ValueConst);
+                    return new AST(tt.root, this, ASTOp.DeclFloat64, null, scope.GetType("double"), false, AST.DataManifest.ValueConst, 0);
 
                 case TokenType.tyFloat:
-                    return new AST(tt.root, this, ASTOp.DeclFloat, null, scope.GetType("double"), false, AST.DataManifest.ValueConst);
+                    return new AST(tt.root, this, ASTOp.DeclFloat, null, scope.GetType("double"), false, AST.DataManifest.ValueConst, 0);
 
                 case TokenType.tyInt:
-                    return new AST(tt.root, this, ASTOp.DeclSInt, null, scope.GetType("int"), false, AST.DataManifest.ValueConst);
+                    return new AST(tt.root, this, ASTOp.DeclSInt, null, scope.GetType("int"), false, AST.DataManifest.ValueConst, 0);
 
                 case TokenType.tyLong:
-                    return new AST(tt.root, this, ASTOp.DeclSInt64, null, scope.GetType("int64"), false, AST.DataManifest.ValueConst);
+                    return new AST(tt.root, this, ASTOp.DeclSInt64, null, scope.GetType("int64"), false, AST.DataManifest.ValueConst, 0);
             }
 
             if(ret == null)
@@ -411,6 +415,7 @@ namespace PxPre.SynthSyn
                     sfd.returnType, 
                     false,
                     AST.CombineManifests(left, right), 
+                    0,
                     left, 
                     right);
             }
@@ -447,6 +452,7 @@ namespace PxPre.SynthSyn
                     sfd.returnType, 
                     false, 
                     AST.DataManifest.Procedural, 
+                    0,
                     right, 
                     left);
             }
@@ -483,20 +489,20 @@ namespace PxPre.SynthSyn
             if(node.root.Matches(TokenType.tyBool) == true)
             {
                 EnsureNoTreeChildNodes(node);
-                return new AST(node.root, this, ASTOp.DeclBool, null, build.rootContext.GetType("bool"), false, AST.DataManifest.ValueConst);
+                return new AST(node.root, this, ASTOp.DeclBool, null, build.rootContext.GetType("bool"), false, AST.DataManifest.ValueConst, 0);
             }
             
             if(node.root.Matches(TokenType.tyInt) == true)
             {
                 EnsureNoTreeChildNodes(node);
                 // All ints are signed by default - they can be casted with the cast optimized out later.
-                return new AST(node.root, this, ASTOp.DeclSInt, null, build.rootContext.GetType("int"), false, AST.DataManifest.ValueConst);
+                return new AST(node.root, this, ASTOp.DeclSInt, null, build.rootContext.GetType("int"), false, AST.DataManifest.ValueConst, 0);
             }
 
             if(node.root.Matches(TokenType.tyFloat) == true)
             {
                 EnsureNoTreeChildNodes(node);
-                return new AST(node.root, this, ASTOp.DeclFloat, null, build.rootContext.GetType("float"), false, AST.DataManifest.ValueConst);
+                return new AST(node.root, this, ASTOp.DeclFloat, null, build.rootContext.GetType("float"), false, AST.DataManifest.ValueConst,0 );
             }
 
             if(node.root.Matches(TokenType.tyDouble) == true)
@@ -510,7 +516,8 @@ namespace PxPre.SynthSyn
                     null, 
                     build.rootContext.GetType("double"), 
                     false, 
-                    AST.DataManifest.ValueConst);
+                    AST.DataManifest.ValueConst,
+                    0);
             }
 
             if(node.root.Matches(TokenType.tyString) == true)
@@ -526,7 +533,8 @@ namespace PxPre.SynthSyn
                     null, 
                     build.rootContext.GetType("string"), 
                     false, 
-                    AST.DataManifest.ValueConst);
+                    AST.DataManifest.ValueConst,
+                    0);
             }
 
             if(node.root.MatchesSymbol(".") == true)
@@ -544,7 +552,7 @@ namespace PxPre.SynthSyn
                 if(svv != null)
                 {
                     // TODO: Do we support const member variables?
-                        AST astDeref = 
+                    AST astDeref = 
                         new AST(
                             node.nodes[1].root, 
                             this, 
@@ -552,15 +560,18 @@ namespace PxPre.SynthSyn
                             svv, 
                             svv.type, 
                             false, 
-                            AST.DataManifest.NoData);
+                            AST.DataManifest.NoData,
+                            0);
 
                     return new AST(
                         node.root, 
                         this, 
                         ASTOp.GetMemberVar, 
-                        svv, svv.type, 
+                        svv, 
+                        svv.type, 
                         true, 
                         AST.DataManifest.Procedural,
+                        0,
                         astSrc,
                         astDeref);
                 }
@@ -570,7 +581,7 @@ namespace PxPre.SynthSyn
                 if(node.nodes[1].root.Matches(TokenType.tyWord) && node.nodes[1].nodes.Count == 0)
                 {
                     SynCanidateFuncs scf = astSrc.evaluatingType.GetCanidateFunctions(node.nodes[1].root.fragment);
-                    AST astPropose = new AST(node.nodes[1].root, this, ASTOp.ProposeMethod, scf, null, false, AST.DataManifest.NoData, astSrc);
+                    AST astPropose = new AST(node.nodes[1].root, this, ASTOp.ProposeMethod, scf, null, false, AST.DataManifest.NoData, 0, astSrc);
                     return astPropose;
                 }
 
@@ -609,7 +620,7 @@ namespace PxPre.SynthSyn
                         case "int64":
                         case "float":
                         case "float64":
-                            return new AST(node.root, this, ASTOp.ExplicitCast, null, styCast, false, AST.CastManifest(astCast.manifest), astCast);
+                            return new AST(node.root, this, ASTOp.ExplicitCast, null, styCast, false, AST.CastManifest(astCast.manifest), 0, astCast);
 
                         case "bool":
                         default:
@@ -623,7 +634,7 @@ namespace PxPre.SynthSyn
                         throw new SynthExceptionSyntax(node.root, "this cannot be used in a static function.");
 
                     SynStruct rootScope = function.GetStructScope();
-                    return new AST(node.root, this, ASTOp.GetThis, rootScope, rootScope, true, AST.DataManifest.Procedural);
+                    return new AST(node.root, this, ASTOp.GetThis, rootScope, rootScope, true, AST.DataManifest.Procedural, 0);
                 }
 
                 if(node.root.Matches("return") == true)
@@ -632,7 +643,7 @@ namespace PxPre.SynthSyn
                         throw new SynthExceptionImpossible("return keyword expected exactly one AST expression node.");
 
                     AST astRet = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
-                    return new AST(node.root, this, ASTOp.ReturnValue, null, astRet.evaluatingType, astRet.hasAddress, AST.DataManifest.Procedural, astRet);
+                    return new AST(node.root, this, ASTOp.ReturnValue, null, astRet.evaluatingType, astRet.hasAddress, AST.DataManifest.Procedural, 0, astRet);
                 }
 
                 // If it matches a known type, we've detected the token is attempting
@@ -647,13 +658,20 @@ namespace PxPre.SynthSyn
                     if(node.nodes[0].keyword != "varname") // TODO: Use const string
                         throw new SynthExceptionImpossible("Pipeline for defining local variable names is corrupt.");
 
-                    this.AddLocalVariable(node.root, sty, node.nodes[0].root.fragment);
+                    int ptrDepth = 0;
+                    foreach(Token t in node.toksToProcess)
+                    { 
+                        if(t.MatchesSymbol("@") == true)
+                            ++ptrDepth;
+                    }
+
+                    this.AddLocalVariable(node.root, sty, node.nodes[0].root.fragment, ptrDepth);
 
                     AST astDeclVar = 
-                        new AST(node.root, this, ASTOp.RegisterLocalVar, null, sty, true, AST.DataManifest.NoData);
+                        new AST(node.root, this, ASTOp.RegisterLocalVar, null, sty, true, AST.DataManifest.NoData, 0);
 
                     AST astVarName = 
-                        new AST(node.nodes[0].root, this, ASTOp.RegisterLocalVarName, null, null, false, AST.DataManifest.NoData);
+                        new AST(node.nodes[0].root, this, ASTOp.RegisterLocalVarName, null, null, false, AST.DataManifest.NoData, 0);
 
                     //int pointerLvl = 0;
                     //foreach(Token t_ttp in node.toksToProcess)
@@ -687,33 +705,34 @@ namespace PxPre.SynthSyn
                         null, 
                         build.rootContext.GetType("int"), 
                         false,
-                        AST.DataManifest.ValueConst);
+                        AST.DataManifest.ValueConst,
+                        0);
                 }
 
                 ValueRef localVR = this.GetLocalVariable(node.root.fragment);
                 if(localVR != null)
-                    return new AST(node.root, this, ASTOp.GetLocalVar, localVR, localVR.varType, true, AST.DataManifest.Procedural);
+                    return new AST(node.root, this, ASTOp.GetLocalVar, localVR, localVR.varType, true, AST.DataManifest.Procedural, localVR.pointerDepth);
 
                 SynVarValue svv = function.GetVar(node.root.fragment);
                 if(svv != null)
                 {
                     if(svv.varLoc == SynVarValue.VarLocation.Member)
                     {
-                        AST astSrc = new AST(node.root, this, ASTOp.GetThis, function.GetStructScope(), function.GetStructScope(), false, AST.DataManifest.Procedural);
-                        AST astDeref = new AST(node.root, this, ASTOp.DerefName, null, svv.type, false, AST.DataManifest.Procedural);
-                        return new AST(node.root, this, ASTOp.GetMemberVar, svv, svv.type, true, AST.DataManifest.Procedural, astSrc, astDeref);
+                        AST astSrc = new AST(node.root, this, ASTOp.GetThis, function.GetStructScope(), function.GetStructScope(), false, AST.DataManifest.Procedural, 0);
+                        AST astDeref = new AST(node.root, this, ASTOp.DerefName, null, svv.type, false, AST.DataManifest.Procedural, 0);
+                        return new AST(node.root, this, ASTOp.GetMemberVar, svv, svv.type, true, AST.DataManifest.Procedural, 0, astSrc, astDeref);
                     }
                     else if(svv.varLoc == SynVarValue.VarLocation.Parameter)
                     {
-                        return new AST(node.root, this, ASTOp.GetParamVar, svv, svv.type, true, AST.DataManifest.Procedural);
+                        return new AST(node.root, this, ASTOp.GetParamVar, svv, svv.type, true, AST.DataManifest.Procedural, 0);
                     }
                     else if(svv.varLoc == SynVarValue.VarLocation.Local)
                     {
-                        return new AST(node.root, this, ASTOp.GetLocalVar, svv, svv.type, true, AST.DataManifest.Procedural);
+                        return new AST(node.root, this, ASTOp.GetLocalVar, svv, svv.type, true, AST.DataManifest.Procedural, 0);
                     }
                     else if(svv.varLoc == SynVarValue.VarLocation.Static)
                     {
-                        return new AST(node.root, this, ASTOp.GetGlobalVar, svv, svv.type, true, AST.DataManifest.Procedural);
+                        return new AST(node.root, this, ASTOp.GetGlobalVar, svv, svv.type, true, AST.DataManifest.Procedural, 0);
                     }
                     //TokenAST astDeref =
                     //new TokenAST(
@@ -742,7 +761,7 @@ namespace PxPre.SynthSyn
 
                 SynCanidateFuncs canFns = function.GetCanidateFunctions(node.root.fragment);
                 if(canFns == null || canFns.functions.Count > 0)
-                    return new AST(node.root, this, ASTOp.GetFunction, canFns, null, false, AST.DataManifest.NoData);
+                    return new AST(node.root, this, ASTOp.GetFunction, canFns, null, false, AST.DataManifest.NoData, 0);
 
                 // TODO: Getting scope
             }
@@ -769,7 +788,7 @@ namespace PxPre.SynthSyn
                 if(pred.evaluatingType == null || pred.evaluatingType.typeName != "bool")
                     throw new SynthExceptionSyntax(node.nodes[0].root, "If statement predicate did not evaluate to a bool.");
 
-                AST astIf = new AST(node.root, this, ASTOp.IfStatement, null, null, false, AST.DataManifest.NoData, pred);
+                AST astIf = new AST(node.root, this, ASTOp.IfStatement, null, null, false, AST.DataManifest.NoData, 0, pred);
 
                 for(int i = 1; i < node.nodes.Count; ++i)
                     astIf.branches.Add(ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[i]));
@@ -792,7 +811,7 @@ namespace PxPre.SynthSyn
                 if(pred.evaluatingType == null || pred.evaluatingType.typeName != "bool")
                     throw new SynthExceptionSyntax(node.nodes[0].root, "While statement predicate did not evaludate to a bool.");
 
-                AST astWhile = new AST(node.root, this, ASTOp.WhileStatement, null, null, false, AST.DataManifest.NoData, pred);
+                AST astWhile = new AST(node.root, this, ASTOp.WhileStatement, null, null, false, AST.DataManifest.NoData, 0, pred);
 
                 for(int i = 1; i < node.nodes.Count; ++i)
                     astWhile.branches.Add(ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[i]));
@@ -810,7 +829,7 @@ namespace PxPre.SynthSyn
                 if(pred.evaluatingType == null || pred.evaluatingType.typeName != "bool")
                     throw new SynthExceptionSyntax(ttLast.root, "dowhile statement predicate did not evaluate to a bool.");
 
-                AST astDoWhile = new AST(node.root, this, ASTOp.DoWhileStatement, null, null, false, AST.DataManifest.NoData);
+                AST astDoWhile = new AST(node.root, this, ASTOp.DoWhileStatement, null, null, false, AST.DataManifest.NoData, 0);
 
                 for(int i = 0; i < node.nodes.Count - 1; ++i)
                     astDoWhile.branches.Add(ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[i]));
@@ -840,6 +859,7 @@ namespace PxPre.SynthSyn
                         left.evaluatingType, 
                         false, 
                         AST.DataManifest.NoData, 
+                        0,
                         left, 
                         right);
 
@@ -878,7 +898,7 @@ namespace PxPre.SynthSyn
                         // under a different context.
                         SynCanidateFuncs canFns = function.GetCanidateFunctions(fragName);
                         if (canFns == null || canFns.functions.Count > 0)
-                            caller = new AST(node.root, this, ASTOp.GetFunction, canFns, null, false, AST.DataManifest.NoData);
+                            caller = new AST(node.root, this, ASTOp.GetFunction, canFns, null, false, AST.DataManifest.NoData, 0);
                         else
                         { 
                             // If it's a type, get a function from the type with the typenames -
@@ -888,7 +908,7 @@ namespace PxPre.SynthSyn
                             { 
                                 SynCanidateFuncs consFns = styFrag.GetCanidateFunctions(fragName);
                                 if(consFns == null || consFns.functions.Count > 0)
-                                    caller = new AST(node.root, this, ASTOp.Construct, consFns, styFrag, false, AST.DataManifest.NoData);
+                                    caller = new AST(node.root, this, ASTOp.Construct, consFns, styFrag, false, AST.DataManifest.NoData, 0);
                             }
                         }
                     }
@@ -975,7 +995,7 @@ namespace PxPre.SynthSyn
                 AST astSrc = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[1]);
                 EnsureTypeIsBitCompatible(astSrc.evaluatingType, node.nodes[1].root);
 
-                return new AST(node.root, this, ASTOp.Index, null, null, true, AST.DataManifest.Procedural, astSrc, astKey);
+                return new AST(node.root, this, ASTOp.Index, null, null, true, AST.DataManifest.Procedural, 0, astSrc, astKey);
             }
 
             if (node.root.MatchesSymbol("+") == true)
@@ -983,7 +1003,7 @@ namespace PxPre.SynthSyn
                 AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
 
-                return new AST(node.root, this, ASTOp.Add, null, left.evaluatingType, false, AST.CombineManifests(left, right), left, right);
+                return new AST(node.root, this, ASTOp.Add, null, left.evaluatingType, false, AST.CombineManifests(left, right), 0, left, right);
             }
 
             if (node.root.MatchesSymbol("-") == true)
@@ -1025,35 +1045,37 @@ namespace PxPre.SynthSyn
                         astExpr.evaluatingType, 
                         false, 
                         astExpr.manifest, 
+                        0,
                         astExpr);
                 }
                 else
                 {
                     AST left, right;
                     EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
-                    return new AST(node.root, this, ASTOp.Sub, null, left.evaluatingType, false, AST.CombineManifests(left, right), left, right);
+                    return new AST(node.root, this, ASTOp.Sub, null, left.evaluatingType, false, AST.CombineManifests(left, right), 0, left, right);
                 }
             }
 
-            if (node.root.MatchesSymbol("*") == true)
+            // The deref handler code is going to be handled closer to where "@" is handled.
+            if (node.root.MatchesSymbol("*") == true && string.IsNullOrEmpty(node.keyword) == true)
             {
                 AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
-                return new AST(node.root, this, ASTOp.Mul, null, left.evaluatingType, false, AST.CombineManifests(left, right), left, right);
+                return new AST(node.root, this, ASTOp.Mul, null, left.evaluatingType, false, AST.CombineManifests(left, right), 0, left, right);
             }
 
             if (node.root.MatchesSymbol("/") == true)
             {
                 AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
-                return new AST(node.root, this, ASTOp.Div, null, left.evaluatingType, false, AST.CombineManifests(left, right), left, right);
+                return new AST(node.root, this, ASTOp.Div, null, left.evaluatingType, false, AST.CombineManifests(left, right), 0, left, right);
             }
 
             if (node.root.MatchesSymbol("%") == true)
             {
                 AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, true, false);
-                return new AST(node.root, this, ASTOp.Mod, null, left.evaluatingType, false, AST.CombineManifests(left, right), left, right);
+                return new AST(node.root, this, ASTOp.Mod, null, left.evaluatingType, false, AST.CombineManifests(left, right), 0, left, right);
             }
 
             if (node.root.MatchesSymbol("&") == true)
@@ -1063,7 +1085,7 @@ namespace PxPre.SynthSyn
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new AST(node.root, this, ASTOp.BitAnd, null, left.evaluatingType, false, AST.CombineManifests(left, right), left, right);
+                return new AST(node.root, this, ASTOp.BitAnd, null, left.evaluatingType, false, AST.CombineManifests(left, right), 0, left, right);
             }
 
             if (node.root.MatchesSymbol("|") == true)
@@ -1073,7 +1095,7 @@ namespace PxPre.SynthSyn
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new AST(node.root, this, ASTOp.BitOr, null, left.evaluatingType, false, AST.CombineManifests(left, right), left, right);
+                return new AST(node.root, this, ASTOp.BitOr, null, left.evaluatingType, false, AST.CombineManifests(left, right), 0, left, right);
             }
 
             if (node.root.MatchesSymbol("^") == true)
@@ -1083,7 +1105,7 @@ namespace PxPre.SynthSyn
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new AST(node.root, this, ASTOp.BitXor, null, left.evaluatingType, false, AST.CombineManifests(left, right), left, right);
+                return new AST(node.root, this, ASTOp.BitXor, null, left.evaluatingType, false, AST.CombineManifests(left, right), 0, left, right);
             }
 
             if( node.root.MatchesSymbol(">>") == true)
@@ -1093,7 +1115,7 @@ namespace PxPre.SynthSyn
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new AST(node.root, this, ASTOp.BitShiftR, null, left.evaluatingType, false, AST.CombineManifests(left, right), left, right);
+                return new AST(node.root, this, ASTOp.BitShiftR, null, left.evaluatingType, false, AST.CombineManifests(left, right), 0, left, right);
             }
 
             if(node.root.MatchesSymbol("<<") == true)
@@ -1103,7 +1125,7 @@ namespace PxPre.SynthSyn
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new AST(node.root, this, ASTOp.BitShiftL, null, left.evaluatingType, false, AST.CombineManifests(left, right), left, right);
+                return new AST(node.root, this, ASTOp.BitShiftL, null, left.evaluatingType, false, AST.CombineManifests(left, right), 0, left, right);
             }
 
             if (node.root.MatchesSymbol("~") == true)
@@ -1118,35 +1140,35 @@ namespace PxPre.SynthSyn
                 if(dm != AST.DataManifest.ValueConst)
                     dm = AST.DataManifest.Procedural;
 
-                return new AST(node.root, this, ASTOp.BitInv, null, evVal.evaluatingType, false, dm, evVal);
+                return new AST(node.root, this, ASTOp.BitInv, null, evVal.evaluatingType, false, dm, 0, evVal);
             }
 
             if (node.root.MatchesSymbol("+=") == true)
             {
                 AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
-                return new AST(node.root, this, ASTOp.SetAfterAdd, null, null, false, AST.DataManifest.NoData, left, right);
+                return new AST(node.root, this, ASTOp.SetAfterAdd, null, null, false, AST.DataManifest.NoData, 0, left, right);
             }
 
             if (node.root.MatchesSymbol("-=") == true)
             {
                 AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
-                return new AST(node.root, this, ASTOp.SetAfterSub, null, null, false, AST.DataManifest.NoData, left, right);
+                return new AST(node.root, this, ASTOp.SetAfterSub, null, null, false, AST.DataManifest.NoData, 0, left, right);
             }
 
             if (node.root.MatchesSymbol("*=") == true)
             {
                 AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
-                return new AST(node.root, this, ASTOp.SetAfterMul, null, null, false, AST.DataManifest.NoData, left, right);
+                return new AST(node.root, this, ASTOp.SetAfterMul, null, null, false, AST.DataManifest.NoData, 0, left, right);
             }
 
             if (node.root.MatchesSymbol("/=") == true)
             {
                 AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
-                return new AST(node.root, this, ASTOp.SetAfterDiv, null, null, false, AST.DataManifest.NoData, left, right);
+                return new AST(node.root, this, ASTOp.SetAfterDiv, null, null, false, AST.DataManifest.NoData, 0, left, right);
             }
 
             if (node.root.MatchesSymbol("%=") == true)
@@ -1154,7 +1176,7 @@ namespace PxPre.SynthSyn
                 AST left, right;
                 EnsureLeftAndRightCompatibility(regCtxBuilders, build, invokingContext, function, node, out left, out right, false, true);
 
-                return new AST(node.root, this, ASTOp.SetAfterMod, null, null, false, AST.DataManifest.NoData, left, right);
+                return new AST(node.root, this, ASTOp.SetAfterMod, null, null, false, AST.DataManifest.NoData, 0, left, right);
             }
 
             if (node.root.MatchesSymbol("&=") == true)
@@ -1164,7 +1186,7 @@ namespace PxPre.SynthSyn
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new AST(node.root, this, ASTOp.SetAfterBitAnd, null, null, false, AST.DataManifest.NoData, left, right);
+                return new AST(node.root, this, ASTOp.SetAfterBitAnd, null, null, false, AST.DataManifest.NoData, 0, left, right);
             }
 
             if (node.root.MatchesSymbol("|=") == true)
@@ -1174,7 +1196,7 @@ namespace PxPre.SynthSyn
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new AST(node.root, this, ASTOp.SetAfterBitOr, null, null, false, AST.DataManifest.NoData, left, right);
+                return new AST(node.root, this, ASTOp.SetAfterBitOr, null, null, false, AST.DataManifest.NoData, 0, left, right);
             }
 
             if (node.root.MatchesSymbol("^=") == true)
@@ -1184,7 +1206,38 @@ namespace PxPre.SynthSyn
                 EnsureTypeIsBitCompatible(left.evaluatingType, node.root);
                 EnsureTypeIsBitCompatible(right.evaluatingType, node.root);
 
-                return new AST(node.root, this, ASTOp.SetAfterBitXor, null, null, false, AST.DataManifest.NoData, left, right);
+                return new AST(node.root, this, ASTOp.SetAfterBitXor, null, null, false, AST.DataManifest.NoData, 0, left, right);
+            }
+
+            if(node.root.MatchesSymbol("@") == true)
+            {
+                if(node.nodes.Count != 1)
+                    throw new SynthExceptionImpossible("Attempting to load address of AST node with incorrect children expressions.");
+
+                if(node.nodes[0].root.Matches("@") == true)
+                    throw new SynthExceptionSyntax(node.nodes[0].root, "Cannot obtain an address of an address; addresses are non-addressable values.");
+
+
+                AST inner = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
+
+                // TODO: Negate things that are dereferenced and addressed execcesively.
+                return new AST(node.root, this, ASTOp.LoadPtrAddr, null, inner.evaluatingType, false, AST.DataManifest.Procedural, 0, inner);
+            }
+
+            if(node.root.MatchesSymbol("*") == true && node.keyword == "deref")
+            { 
+                if(node.nodes.Count != 1)
+                    throw new SynthExceptionImpossible("Attempting to dereference address of AST node with incorrect children expressions.");
+
+                AST inner = ProcessFunctionExpression(regCtxBuilders, build, invokingContext, function, node.nodes[0]);
+                if(inner.evaluatingType == null)
+                    throw new SynthExceptionSyntax(node.root, "Attempting to derefence unknown value type.");
+
+                if(inner.ptrDepth == 0)
+                    throw new SynthExceptionSyntax(node.root, "Attempting to derefence a non-pointer");
+
+                // TODO: Negate things that are dereferenced and addressed execcesively.
+                return new AST(node.root, this, ASTOp.DerefPtrAddr, null, inner.evaluatingType, false, AST.DataManifest.Procedural, 0, inner);
             }
 
             return null;
@@ -1366,20 +1419,20 @@ namespace PxPre.SynthSyn
                 // declared as a const in the SynthSyntax script.
                 if (canCastLeft == false)
                 {
-                    AST cast = new AST(right.token, this, ASTOp.ImplicitCast, stySig, stySig, false, AST.CastManifest(right.manifest), right);
+                    AST cast = new AST(right.token, this, ASTOp.ImplicitCast, stySig, stySig, false, AST.CastManifest(right.manifest), 0, right);
                     right = cast;
                     return;
                 }
                 else
                 {
-                    AST cast = new AST(left.token, this, ASTOp.ImplicitCast, stySig, stySig, false, AST.CastManifest(left.manifest), left);
+                    AST cast = new AST(left.token, this, ASTOp.ImplicitCast, stySig, stySig, false, AST.CastManifest(left.manifest), 0, left);
                     left = cast;
                 }
             }
 
             if(right.evaluatingType != stySig)
             {
-                AST cast = new AST( right.token, this, ASTOp.ImplicitCast, stySig, stySig, false, AST.CastManifest(right.manifest), right);
+                AST cast = new AST( right.token, this, ASTOp.ImplicitCast, stySig, stySig, false, AST.CastManifest(right.manifest), 0, right);
                 right = cast;
             }
         }
@@ -1401,7 +1454,7 @@ namespace PxPre.SynthSyn
 
             if (right.evaluatingType != leftTy)
             {
-                AST cast = new AST(right.token, this, ASTOp.ImplicitCast, leftTy, leftTy, false, AST.CastManifest(right.manifest), right);
+                AST cast = new AST(right.token, this, ASTOp.ImplicitCast, leftTy, leftTy, false, AST.CastManifest(right.manifest), 0, right);
                 right = cast;
             }
         }
@@ -1607,6 +1660,37 @@ namespace PxPre.SynthSyn
 
                         vr.PutInstrinsicValueOnStack(fnBuild);
                         return new ValueRef(ValueLoc.ValueOnStack, -1, -1, vr.varType);
+                    }
+
+                case ASTOp.LoadPtrAddr:
+                    {
+                        if(expr.branches.Count != 1)
+                            throw new SynthExceptionCompile("LoadPtrAddr expected 1 branch to process.");
+
+                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
+                        vr.PutLocalVarAddressOnStack(fnBuild);
+
+                        return new ValueRef(ValueLoc.PointerOnStack, -1, -1, vr.varType, vr.pointerDepth + 1);
+                    }
+
+                case ASTOp.DerefPtrAddr:
+                    { 
+                        if(expr.branches.Count != 1)
+                            throw new SynthExceptionCompile("DerefPtrAddr expected 1 branch to process.");
+
+                        ValueRef vr = BuildBSFunctionExpression(fnd, expr.branches[0], wasmBuild, ctxBuilder, fnBuild);
+
+                        int depth = vr.pointerDepth - 1;
+                        if(depth == 0)
+                        { 
+                            if(vr.varType.intrinsic == true)
+                            { 
+                                vr.PutInstrinsicValueOnStack(fnBuild);
+                                return new ValueRef(ValueLoc.ValueOnStack, -1, -1, vr.varType, 0);
+                            }
+                        }
+                        vr.PutLocalVarAddressOnStack(fnBuild);
+                        return new ValueRef(ValueLoc.PointerOnStack, -1, -1, vr.varType, depth);
                     }
 
                 case ASTOp.GetFunction:

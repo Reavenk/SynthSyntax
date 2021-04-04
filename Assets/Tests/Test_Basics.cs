@@ -81,5 +81,17 @@ namespace Tests
         {
             UnitTest_Utils.PerformContainedTest("SynthScripts/Simple/Vali_Simple013_LineMacro.synsyn");
         }
+
+        [Test]
+        public void Test014_Pointer()
+        {
+            UnitTest_Utils.PerformContainedTest("SynthScripts/Simple/Vali_Simple014_Pointer.synsyn");
+        }
+
+        [Test]
+        public void Test015_PointerCollapseRef()
+        {
+            UnitTest_Utils.PerformContainedTest("SynthScripts/Simple/Vali_Simple015_PointerCollapseRef.synsyn");
+        }
     }
 }

@@ -43,7 +43,17 @@ namespace PxPre.SynthSyn
         public string varName;
 
         public string typeName;
-        public SynType type;
+
+        public SynTypeDepth typeDepth;
+
+        public SynType type 
+        { 
+            get => this.typeDepth.type;
+            set
+            { 
+                this.typeDepth.type = value;
+            }
+        }
 
         public VarLocation varLoc;
 
@@ -99,16 +109,16 @@ namespace PxPre.SynthSyn
             string varName = "";
 
             ++idx;
-            if(tokens[idx].MatchesSymbol("*") == true)
-            {
-                dataType = VarValueDataType.Pointer;
-                ++idx;
-            }
-            else if(tokens[idx].Matches("&") == true)
-            {
-                dataType = VarValueDataType.Reference;
-                ++idx;
-            }
+            //if(tokens[idx].MatchesSymbol("*") == true)
+            //{
+            //    dataType = VarValueDataType.Pointer;
+            //    ++idx;
+            //}
+            //else if(tokens[idx].Matches("&") == true)
+            //{
+            //    dataType = VarValueDataType.Reference;
+            //    ++idx;
+            //}
 
             if (tokens[idx].Matches(TokenType.tyWord) == false)
                 return null;

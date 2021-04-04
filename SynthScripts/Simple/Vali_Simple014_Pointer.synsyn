@@ -1,0 +1,22 @@
+// Test the __LINE__ macro.
+//
+// >> Name: Line Macro
+// >> Results: {50, 60}
+//
+
+extern void LogTest(int loggedVal);
+extern void EndTest();
+
+entry DoTest()
+{
+	int i1 = 50;
+	int i2 = 60;
+	
+	int @ pi = @i1;
+	LogTest(*pi);
+	
+	pi = @i2;
+	LogTest(*pi);
+
+	EndTest();
+}

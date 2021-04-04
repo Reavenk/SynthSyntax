@@ -307,13 +307,13 @@ namespace PxPre.SynthSyn
                 
                 if(svv.type.intrinsic == true)
                 {
-                    AST astSrcDeref = new AST(new Token(-1, svv.varName, TokenType.tyWord), scb, ASTOp.DerefName, null, svv.type, false, AST.DataManifest.Procedural);
-                    AST astSrcGetMember = new AST(new Token(), scb, ASTOp.GetMemberVar, svvSrc, this, false, AST.DataManifest.Procedural, astSrcDeref);
+                    AST astSrcDeref = new AST(new Token(-1, svv.varName, TokenType.tyWord), scb, ASTOp.DerefName, null, svv.type, false, AST.DataManifest.Procedural, 0);
+                    AST astSrcGetMember = new AST(new Token(), scb, ASTOp.GetMemberVar, svvSrc, this, false, AST.DataManifest.Procedural, 0, astSrcDeref);
 
-                    AST astDstDeref = new AST(new Token(-1, svv.varName, TokenType.tyWord), scb, ASTOp.DerefName, null, svv.type, false, AST.DataManifest.Procedural);
-                    AST astDstGetMember = new AST(new Token(), scb, ASTOp.GetMemberVar, svvSrc, this, false, AST.DataManifest.Procedural, astSrcDeref);
+                    AST astDstDeref = new AST(new Token(-1, svv.varName, TokenType.tyWord), scb, ASTOp.DerefName, null, svv.type, false, AST.DataManifest.Procedural, 0);
+                    AST astDstGetMember = new AST(new Token(), scb, ASTOp.GetMemberVar, svvSrc, this, false, AST.DataManifest.Procedural, 0, astSrcDeref);
 
-                    AST astSetVar = new AST(new Token(), scb, ASTOp.SetValue, null, null, false, AST.DataManifest.NoData, astSrcDeref, astSrcGetMember);
+                    AST astSetVar = new AST(new Token(), scb, ASTOp.SetValue, null, null, false, AST.DataManifest.NoData, 0, astSrcDeref, astSrcGetMember);
                     sfdCC.ast.branches.Add(astSetVar);
                 }
                 else
